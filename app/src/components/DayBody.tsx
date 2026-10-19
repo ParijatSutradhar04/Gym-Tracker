@@ -8,12 +8,14 @@ import { ExerciseList } from './ExerciseList';
 import { Icon } from './icons';
 import { ScheduleBanner } from './ScheduleBanner';
 import { ScheduleSheet } from './ScheduleSheet';
+import { SetsSheet } from './SetsSheet';
 
 export function DayBody({ date }: { date: DateStr }) {
   const state = useGymState();
   const ctx = useCtx();
   const day = getDay(state, ctx, date);
   const [scheduleMode, setScheduleMode] = useState<'add' | 'change' | null>(null);
+  const [openPosition, setOpenPosition] = useState<number | null>(null);
   const empty = day.canEditSchedule && !day.routine;
   return (
     <View className="px-5">
@@ -32,13 +34,19 @@ export function DayBody({ date }: { date: DateStr }) {
           </Text>
         </View>
       ) : null}
-      <ExerciseList day={day} onSelect={() => {}} />
+      <ExerciseList day={day} onSelect={setOpenPosition} />
       <ScheduleSheet
         mode={scheduleMode ?? 'add'}
         date={date}
         day={day}
         visible={scheduleMode !== null}
         onClose={() => setScheduleMode(null)}
+      />
+      <SetsSheet
+        date={date}
+        position={openPosition ?? 0}
+        visible={openPosition !== null}
+        onClose={() => setOpenPosition(null)}
       />
     </View>
   );
