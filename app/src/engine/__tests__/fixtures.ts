@@ -1,6 +1,9 @@
-import type { Change, Ctx, DataState, RepeatRule, RoutineVersion } from '../types';
+import { expect } from 'vitest';
+import { EngineError, type Change, type Ctx, type DataState, type EngineErrorCode, type RepeatRule, type RoutineVersion } from '../types';
 import type { DateStr } from '../dates';
 import { applyChanges, getIndex } from '../state';
+import { dayExercises } from '../dayLog';
+import { normalizeName, syncSets } from '../sets';
 
 export function makeCtx(today: DateStr, startSeq = 0): Ctx {
   let seq = startSeq;
@@ -92,4 +95,36 @@ export function addMove(
       },
     },
   ]);
+}
+
+/** Logs sets for the exercise with this (normalized) name on the date, as a Done tap would. */
+export function logSets(
+  state: DataState,
+  ctx: Ctx,
+  date: DateStr,
+  exerciseName: string,
+  rows: [number | null, number | null][],
+): DataState {
+  const position = dayExercises(state, date).findIndex((x) => normalizeName(x.name) === normalizeName(exerciseName));
+  if (position < 0) throw new Error(`No exercise ${exerciseName} on ${date}`);
+  return applyChanges(
+    state,
+    syncSets(state, ctx, {
+      date,
+      position,
+      rows: rows.map(([reps, weightKg]) => ({ reps, weightKg, touched: true })),
+      includeUntouched: true,
+    }),
+  );
+}
+
+export function expectCode(fn: () => unknown, code: EngineErrorCode): void {
+  try {
+    fn();
+  } catch (e) {
+    expect(e).toBeInstanceOf(EngineError);
+    expect((e as EngineError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected EngineError ${code}, nothing was thrown`);
 }
