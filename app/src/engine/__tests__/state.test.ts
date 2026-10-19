@@ -93,4 +93,13 @@ describe('state', () => {
     expect(rec.changes().map((c) => c.row.id)).toEqual(['d1', 'd2']);
     expect(getIndex(rec.state()).dayByDate.size).toBe(2);
   });
+
+  test('createRecorder_keeps_one_change_per_row_with_the_last_write', () => {
+    const rec = createRecorder(emptyState());
+    rec.apply([day('d1', '2026-10-19', '2026-10-19T10:00:00.000Z'), day('d2', '2026-10-20', '2026-10-19T10:00:00.000Z')]);
+    rec.apply([day('d1', '2026-10-19', '2026-10-19T10:00:00.000Z', { status: 'missed' })]);
+    const changes = rec.changes();
+    expect(changes.map((c) => c.row.id)).toEqual(['d1', 'd2']);
+    expect((changes[0].row as Day).status).toBe('missed');
+  });
 });

@@ -69,15 +69,26 @@ export interface Recorder {
   changes(): Change[];
 }
 
-/** Lets a command read its own intermediate writes while collecting them. */
+/**
+ * Lets a command read its own intermediate writes while collecting them. A row written twice keeps
+ * only its last write (in its first slot), so a command never emits two same-timestamp versions of a row.
+ */
 export function createRecorder(initial: DataState): Recorder {
   let current = initial;
   const all: Change[] = [];
+  const slot = new Map<string, number>();
   return {
     state: () => current,
     apply(changes) {
       current = applyChanges(current, changes);
-      all.push(...changes);
+      for (const c of changes) {
+        const key = c.table + ':' + c.row.id;
+        const i = slot.get(key);
+        if (i === undefined) {
+          slot.set(key, all.length);
+          all.push(c);
+        } else all[i] = c;
+      }
     },
     changes: () => all.slice(),
   };

@@ -1,8 +1,9 @@
 import { expect } from 'vitest';
 import { EngineError, type Change, type Ctx, type DataState, type EngineErrorCode, type RepeatRule, type RoutineVersion } from '../types';
-import type { DateStr } from '../dates';
+import { addDays, eachDay, type DateStr } from '../dates';
 import { applyChanges, getIndex } from '../state';
 import { dayExercises } from '../dayLog';
+import { scheduleBetween } from '../schedule';
 import { normalizeName, syncSets } from '../sets';
 
 export function makeCtx(today: DateStr, startSeq = 0): Ctx {
@@ -127,4 +128,28 @@ export function expectCode(fn: () => unknown, code: EngineErrorCode): void {
     return;
   }
   throw new Error(`Expected EngineError ${code}, nothing was thrown`);
+}
+
+export const WEEK_TITLES = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms'] as const;
+export const WEEK_EXERCISES: Record<(typeof WEEK_TITLES)[number], string[]> = {
+  Chest: ['Bench press', 'Cable fly'],
+  Back: ['Row'],
+  Legs: ['Squat'],
+  Shoulders: ['Press'],
+  Arms: ['Curl'],
+};
+
+/** Five weekly routines, Mon–Fri from 2026-10-19, created in order Chest, Back, Legs, Shoulders, Arms; weekend rest. */
+export function seedWeek(state: DataState, ctx: Ctx): DataState {
+  return WEEK_TITLES.reduce(
+    (s, title, i) =>
+      seedRoutine(s, ctx, { title, repeatRule: 'weekly', startDate: addDays('2026-10-19', i), exercises: WEEK_EXERCISES[title] }),
+    state,
+  );
+}
+
+/** Date → scheduled title (null on rest days), inclusive. */
+export function scheduleSnapshot(state: DataState, from: DateStr, to: DateStr): [DateStr, string | null][] {
+  const sched = scheduleBetween(state, from, to);
+  return eachDay(from, to).map((d) => [d, sched.get(d)?.title ?? null]);
 }
