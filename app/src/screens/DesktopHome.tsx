@@ -72,7 +72,9 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
         </View>
         <Text className="font-sans-medium text-accent text-[14px] ml-16">Workout</Text>
         <Text className="font-sans text-muted text-[14px] ml-8 flex-1">Your training, one day at a time.</Text>
-        <SyncStatusSlot />
+        <View className="mr-6">
+          <SyncStatusSlot />
+        </View>
         <Text className="font-mono text-muted text-[12px]">{headerDate(today)}</Text>
       </View>
       <SaveErrorBanner />

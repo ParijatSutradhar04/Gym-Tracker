@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { AppState, Text, View } from 'react-native';
 import { msUntilNextMidnight, todayLocal, type DateStr } from '../engine/dates';
+import { SyncRuntime } from '../sync/SyncRuntime';
 import { GymStore } from './GymStore';
 import { newId, nowIso } from './ids';
 import { createDataStore } from './index';
@@ -41,7 +42,10 @@ function LoadErrorScreen({ message }: { message: string }) {
 }
 
 export function GymProvider({ children }: { children: ReactNode }) {
-  const [store] = useState(() => new GymStore(createDataStore(), { newId, now: nowIso }));
+  const [{ data, store }] = useState(() => {
+    const data = createDataStore();
+    return { data, store: new GymStore(data, { newId, now: nowIso }) };
+  });
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const today = useTodayClock();
@@ -59,7 +63,11 @@ export function GymProvider({ children }: { children: ReactNode }) {
   if (!ready) return null;
   return (
     <StoreContext.Provider value={store}>
-      <TodayContext.Provider value={today}>{children}</TodayContext.Provider>
+      <TodayContext.Provider value={today}>
+        <SyncRuntime outbox={data} gym={store}>
+          {children}
+        </SyncRuntime>
+      </TodayContext.Provider>
     </StoreContext.Provider>
   );
 }
