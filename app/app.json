@@ -28,7 +28,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "owner": "parijatsutradhars-team"
   }
