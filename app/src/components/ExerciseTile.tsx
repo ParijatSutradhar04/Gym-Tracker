@@ -47,7 +47,7 @@ export function ExerciseTile({ exercise, selected, onPress, onRename, onDelete }
             if (e.nativeEvent.key === 'Escape') finish(false);
           }}
           selectTextOnFocus
-          className="flex-1 h-10 font-sans-semibold text-ink text-[14px]"
+          className="flex-1 min-w-0 h-10 font-sans-semibold text-ink text-[14px]"
         />
       ) : (
         <Pressable accessibilityRole="button" onPress={onPress} className="flex-1 justify-center h-full">

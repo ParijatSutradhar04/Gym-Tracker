@@ -221,7 +221,7 @@ function PanelTitle({ name, onRename }: { name: string; onRename: (name: string)
             if (e.nativeEvent.key === 'Escape') finish(false);
           }}
           selectTextOnFocus
-          className="flex-1 h-11 font-sans-medium text-ink text-[28px] p-0"
+          className="flex-1 min-w-0 h-11 font-sans-medium text-ink text-[28px] p-0"
         />
       ) : (
         <Text className="flex-1 font-sans-medium text-ink text-[28px]" numberOfLines={1}>

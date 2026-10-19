@@ -104,11 +104,11 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
         <Text className="font-sans text-muted text-[12px] mt-3 mb-5">Dial in your reps. Build on your last set.</Text>
         </>
       )}
-      <View className="gap-3">
+      <View className="gap-[10px]">
         {rows.map((r, i) => (
           <View key={i}>
-            <View className="flex-row items-center gap-2">
-              <Text className="font-sans text-muted text-[12px] w-9">Set {i + 1}</Text>
+            <View className="flex-row items-center gap-2 h-[60px]">
+              <Text className="font-sans-medium text-muted text-[12px] w-12">Set {i + 1}</Text>
               <Field
                 value={r.repsText}
                 suffix="Reps"
@@ -132,12 +132,12 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
                   onPress={() => commit(rows.filter((_, j) => j !== i))}
                   className="w-11 h-11 items-center justify-center"
                 >
-                  <Icon name="X" size={18} color={colors.ink} />
+                  <Icon name="X" size={20} color={colors.ink} />
                 </Pressable>
               )}
             </View>
             {r.repsBad || r.kgBad ? (
-              <Text className="font-sans text-muted text-[11px] ml-11 mt-1">Invalid</Text>
+              <Text className="font-sans text-muted text-[11px] ml-14 mt-1">Invalid</Text>
             ) : null}
           </View>
         ))}
@@ -172,7 +172,7 @@ interface FieldProps {
 
 function Field({ value, suffix, keyboardType, disabled, onChangeText }: FieldProps) {
   return (
-    <View className={`flex-1 h-12 rounded-[10px] border border-border bg-bg flex-row items-center px-3 ${disabled ? 'opacity-50' : ''}`}>
+    <View className={`flex-1 h-[52px] rounded-[10px] border border-border bg-bg flex-row items-center px-3 ${disabled ? 'opacity-50' : ''}`}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -181,9 +181,10 @@ function Field({ value, suffix, keyboardType, disabled, onChangeText }: FieldPro
         selectTextOnFocus
         placeholderTextColor={colors.faint}
         accessibilityLabel={suffix}
-        className="flex-1 font-mono text-ink text-[22px] p-0"
+        // min-w-0: a web <input> otherwise keeps its ~20-character default width and pushes the unit out of the box.
+        className="flex-1 min-w-0 font-mono text-ink text-[18px] p-0"
       />
-      <Text className="font-sans text-muted text-[11px] ml-1">{suffix}</Text>
+      <Text className="font-sans text-muted text-[11px] ml-1 shrink-0">{suffix}</Text>
     </View>
   );
 }
