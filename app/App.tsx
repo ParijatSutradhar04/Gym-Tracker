@@ -2,6 +2,7 @@ import './global.css';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, useFonts } from '@expo-google-fonts/inter';
 import { RobotoMono_400Regular, RobotoMono_500Medium } from '@expo-google-fonts/roboto-mono';
 import { StatusBar } from 'expo-status-bar';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { GymProvider } from './src/data/GymProvider';
 import { HomeScreen } from './src/screens/HomeScreen';
 
@@ -17,7 +18,9 @@ export default function App() {
   return (
     <>
       <GymProvider>
-        <HomeScreen />
+        <ErrorBoundary>
+          <HomeScreen />
+        </ErrorBoundary>
       </GymProvider>
       <StatusBar style="light" />
     </>

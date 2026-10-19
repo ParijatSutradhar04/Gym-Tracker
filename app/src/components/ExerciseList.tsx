@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
-import { useActions } from '../data/hooks';
-import { formatCount } from '../engine/dates';
-import type { DayView } from '../engine/dayView';
+import { useActions, useGymState } from '../data/hooks';
+import { formatCount, type DateStr } from '../engine/dates';
+import type { DayView, ExerciseView } from '../engine/dayView';
+import { setsLostOnDelete } from '../engine/scheduleEdits';
 import { EngineError } from '../engine/types';
 import { colors } from '../theme';
+import { Button } from './Button';
+import { Dialog } from './Dialog';
 import { ExerciseTile } from './ExerciseTile';
 
 interface Props {
@@ -25,10 +28,19 @@ function ignoreEngineError(fn: () => void) {
 }
 
 export function ExerciseList({ day, selectedPosition, onSelect, hint }: Props) {
+  const state = useGymState();
   const actions = useActions();
   const [name, setName] = useState('');
+  // A delete that would take logged sets with it asks first; nothing else does.
+  const [confirm, setConfirm] = useState<{ date: DateStr; position: number; name: string; sets: number } | null>(null);
   if (!day.routine && !day.hasLog) return null;
   const { date } = day;
+
+  const remove = (x: ExerciseView) => {
+    const sets = setsLostOnDelete(state, date, x.position);
+    if (sets > 0) setConfirm({ date, position: x.position, name: x.name, sets });
+    else ignoreEngineError(() => actions.deleteExercise({ date, position: x.position }));
+  };
 
   const add = () => {
     if (!name.trim()) return;
@@ -55,7 +67,7 @@ export function ExerciseList({ day, selectedPosition, onSelect, hint }: Props) {
             selected={selectedPosition === x.position}
             onPress={() => onSelect(x.position)}
             onRename={(n) => ignoreEngineError(() => actions.renameExercise({ date, position: x.position, name: n }))}
-            onDelete={() => ignoreEngineError(() => actions.deleteExercise({ date, position: x.position }))}
+            onDelete={() => remove(x)}
           />
         ))}
         <TextInput
@@ -69,6 +81,25 @@ export function ExerciseList({ day, selectedPosition, onSelect, hint }: Props) {
           className="h-14 rounded-[10px] border border-border px-4 font-sans text-ink text-[14px]"
         />
       </View>
+      <Dialog visible={confirm !== null} onClose={() => setConfirm(null)}>
+        {confirm ? (
+          <View className="gap-4">
+            <Text className="font-sans-medium text-ink text-[22px]">Delete {confirm.name}?</Text>
+            <Text className="font-sans text-muted text-[14px] leading-5">
+              This also deletes {confirm.sets === 1 ? '1 logged set' : `${confirm.sets} logged sets`} from this day.
+            </Text>
+            <Button
+              variant="primary"
+              label="Delete"
+              onPress={() => {
+                ignoreEngineError(() => actions.deleteExercise({ date: confirm.date, position: confirm.position }));
+                setConfirm(null);
+              }}
+            />
+            <Button variant="secondary" label="Cancel" onPress={() => setConfirm(null)} />
+          </View>
+        ) : null}
+      </Dialog>
     </View>
   );
 }

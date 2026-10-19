@@ -83,6 +83,44 @@ describe('GymStore', () => {
     expect((await new LocalStore(storage, deps('ob')).load()).days.has('a2')).toBe(true);
   });
 
+  test('failed_changes_are_saved_with_the_next_write', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storage.failNextWrite();
+    gym.dispatch([day('a1')]);
+    await gym.whenIdle();
+    gym.dispatch([day('a2')]);
+    await gym.whenIdle();
+    const s = await new LocalStore(storage, deps('ob')).load();
+    expect([...s.days.keys()].sort()).toEqual(['a1', 'a2']);
+    expect(gym.lastError).toBeNull();
+  });
+
+  test('retry_saves_failed_changes_without_a_new_edit', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storage.failNextWrite();
+    gym.dispatch([day('a1')]);
+    await gym.whenIdle();
+    gym.retry();
+    await gym.whenIdle();
+    expect((await new LocalStore(storage, deps('ob')).load()).days.has('a1')).toBe(true);
+    expect(gym.lastError).toBeNull();
+  });
+
+  test('save_failure_and_recovery_notify_subscribers', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errors: (Error | null)[] = [];
+    gym.subscribe(() => errors.push(gym.lastError));
+    storage.failNextWrite();
+    gym.dispatch([day('a1')]);
+    await gym.whenIdle();
+    gym.retry();
+    await gym.whenIdle();
+    expect(errors.map((e) => e !== null)).toEqual([false, true, false]);
+  });
+
   test('init_propagates_StoreCorruptError', async () => {
     const storage = new MemoryStorage();
     await storage.multiSet([['gt:v1:row:days:a', '{not json']]);

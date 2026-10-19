@@ -8,6 +8,7 @@ import {
   deleteExercise,
   renameExercise,
   routineTitleSuggestions,
+  setsLostOnDelete,
   stopRoutine,
 } from '../scheduleEdits';
 import { emptyState, getIndex, liveRows } from '../state';
@@ -169,6 +170,21 @@ describe('exercise edits', () => {
     const { ctx, s } = chest('2026-10-26');
     expectCode(() => addExercise(s, ctx, { date: '2026-10-20', name: 'Dips' }), 'NO_ROUTINE');
     expectCode(() => addExercise(s, ctx, { date: '2026-10-27', name: 'Dips' }), 'NO_ROUTINE');
+  });
+
+  test('sets_lost_on_delete_counts_what_deleteExercise_removes', () => {
+    let { ctx, s } = chest('2026-10-19', '2026-10-12');
+    expect(setsLostOnDelete(s, '2026-10-19', 0)).toBe(0);
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 60]]);
+    s = logSets(s, ctx, '2026-10-12', 'Cable fly', [[12, 20]]);
+    const removed = (date: string, position: number) =>
+      deleteExercise(s, ctx, { date, position }).filter((c) => c.table === 'sets').length;
+    expect(setsLostOnDelete(s, '2026-10-19', 0)).toBe(2);
+    expect(setsLostOnDelete(s, '2026-10-19', 0)).toBe(removed('2026-10-19', 0));
+    expect(setsLostOnDelete(s, '2026-10-19', 1)).toBe(0);
+    expect(setsLostOnDelete(s, '2026-10-12', 1)).toBe(removed('2026-10-12', 1));
+    expect(setsLostOnDelete(s, '2026-10-12', 1)).toBe(1);
+    expect(setsLostOnDelete(s, '2026-10-26', 0)).toBe(0);
   });
 
   test('position_out_of_range_throws_NOT_FOUND', () => {

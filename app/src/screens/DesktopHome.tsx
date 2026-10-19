@@ -7,6 +7,7 @@ import { ExerciseList } from '../components/ExerciseList';
 import { Icon } from '../components/icons';
 import { IconButton } from '../components/IconButton';
 import { ScheduleBanner } from '../components/ScheduleBanner';
+import { SaveErrorBanner } from '../components/SaveErrorBanner';
 import { ScheduleSheet } from '../components/ScheduleSheet';
 import { SetsEditor } from '../components/SetsEditor';
 import { StatsCard } from '../components/StatsCard';
@@ -51,7 +52,8 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
   const today = useToday();
   const actions = useActions();
   const day = getDay(state, ctx, selected);
-  const [scheduleMode, setScheduleMode] = useState<'add' | 'change' | null>(null);
+  // The sheet keeps the date it opened on, so midnight moving the selection never retargets it.
+  const [schedule, setSchedule] = useState<{ mode: 'add' | 'change'; date: DateStr } | null>(null);
   const [backfillOpen, setBackfillOpen] = useState(false);
   // The pick is scoped to a date; a stale or missing position falls back to the first exercise.
   const [pick, setPick] = useState<{ date: DateStr; position: number } | null>(null);
@@ -73,6 +75,7 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
         <SyncStatusSlot />
         <Text className="font-mono text-muted text-[12px]">{headerDate(today)}</Text>
       </View>
+      <SaveErrorBanner />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="w-full max-w-[1360px] self-center px-20 pt-12 pb-10 flex-1">
           <View className="flex-row items-start justify-between">
@@ -103,8 +106,8 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
               <DateBar selected={selected} onSelect={onSelect} inset={0} />
               <ScheduleBanner
                 day={day}
-                onAdd={() => setScheduleMode('add')}
-                onChange={() => setScheduleMode('change')}
+                onAdd={() => setSchedule({ mode: 'add', date: selected })}
+                onChange={() => setSchedule({ mode: 'change', date: selected })}
                 onBackfill={() => setBackfillOpen(true)}
                 onRestore={(shiftId) => {
                   try {
@@ -132,7 +135,7 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
                 <View className="rounded-[16px] bg-surface p-6">
                   <Text className="font-sans-semibold text-accent text-[10px] tracking-wider">SET DETAILS</Text>
                   <PanelTitle
-                    key={`${selected}:${current.position}`}
+                    key={`${selected}:${current.position}:${current.name}`}
                     name={current.name}
                     onRename={(name) => {
                       try {
@@ -145,8 +148,9 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
                   <Text className="font-sans text-muted text-[12px] mt-3 mb-5">
                     Record your reps and weight for each set.
                   </Text>
+                  {/* Keyed by name too: deleting an exercise shifts the next one into this position. */}
                   <SetsEditor
-                    key={`${selected}:${current.position}`}
+                    key={`${selected}:${current.position}:${current.name}`}
                     date={selected}
                     position={current.position}
                     readOnly={false}
@@ -182,11 +186,11 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
         </View>
       </ScrollView>
       <ScheduleSheet
-        mode={scheduleMode ?? 'add'}
-        date={selected}
-        day={day}
-        visible={scheduleMode !== null}
-        onClose={() => setScheduleMode(null)}
+        mode={schedule?.mode ?? 'add'}
+        date={schedule?.date ?? selected}
+        day={schedule && schedule.date !== selected ? getDay(state, ctx, schedule.date) : day}
+        visible={schedule !== null}
+        onClose={() => setSchedule(null)}
       />
       <BackfillSheet date={selected} visible={backfillOpen} onClose={() => setBackfillOpen(false)} />
     </SafeAreaView>

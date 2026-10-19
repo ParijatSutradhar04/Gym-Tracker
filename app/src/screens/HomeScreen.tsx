@@ -6,6 +6,7 @@ import { DayBody } from '../components/DayBody';
 import { ExportSheet } from '../components/ExportSheet';
 import { GymMissedDialog } from '../components/GymMissedDialog';
 import { GymMissedFab } from '../components/GymMissedFab';
+import { SaveErrorBanner } from '../components/SaveErrorBanner';
 import { TopBar } from '../components/TopBar';
 import { UndoBar } from '../components/UndoBar';
 import { useActions, useCtx, useGymState, useGymStore, useLayout, useToday } from '../data/hooks';
@@ -81,6 +82,7 @@ export function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <TopBar onExport={() => setExportOpen(true)} />
+      <SaveErrorBanner />
       <DateBar selected={selected} onSelect={setSelected} />
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <DayBody date={selected} />

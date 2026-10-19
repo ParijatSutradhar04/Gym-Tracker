@@ -17,16 +17,17 @@ export function DayBody({ date }: { date: DateStr }) {
   const ctx = useCtx();
   const actions = useActions();
   const day = getDay(state, ctx, date);
-  const [scheduleMode, setScheduleMode] = useState<'add' | 'change' | null>(null);
+  // Open sheets keep the date they opened on, so midnight moving the selection never retargets them.
+  const [schedule, setSchedule] = useState<{ mode: 'add' | 'change'; date: DateStr } | null>(null);
   const [backfillOpen, setBackfillOpen] = useState(false);
-  const [openPosition, setOpenPosition] = useState<number | null>(null);
+  const [openSets, setOpenSets] = useState<{ date: DateStr; position: number } | null>(null);
   const empty = day.canEditSchedule && !day.routine;
   return (
     <View className="px-5">
       <ScheduleBanner
         day={day}
-        onAdd={() => setScheduleMode('add')}
-        onChange={() => setScheduleMode('change')}
+        onAdd={() => setSchedule({ mode: 'add', date })}
+        onChange={() => setSchedule({ mode: 'change', date })}
         onBackfill={() => setBackfillOpen(true)}
         onRestore={(shiftId) => {
           try {
@@ -54,20 +55,20 @@ export function DayBody({ date }: { date: DateStr }) {
       {day.canBackfill ? (
         <Text className="font-sans text-muted text-[14px] mt-6 text-center">Nothing logged for this day.</Text>
       ) : null}
-      <ExerciseList day={day} onSelect={setOpenPosition} />
+      <ExerciseList day={day} onSelect={(position) => setOpenSets({ date, position })} />
       <ScheduleSheet
-        mode={scheduleMode ?? 'add'}
-        date={date}
-        day={day}
-        visible={scheduleMode !== null}
-        onClose={() => setScheduleMode(null)}
+        mode={schedule?.mode ?? 'add'}
+        date={schedule?.date ?? date}
+        day={schedule && schedule.date !== date ? getDay(state, ctx, schedule.date) : day}
+        visible={schedule !== null}
+        onClose={() => setSchedule(null)}
       />
       <BackfillSheet date={date} visible={backfillOpen} onClose={() => setBackfillOpen(false)} />
       <SetsSheet
-        date={date}
-        position={openPosition ?? 0}
-        visible={openPosition !== null}
-        onClose={() => setOpenPosition(null)}
+        date={openSets?.date ?? date}
+        position={openSets?.position ?? 0}
+        visible={openSets !== null}
+        onClose={() => setOpenSets(null)}
       />
     </View>
   );

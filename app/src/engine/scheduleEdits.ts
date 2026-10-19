@@ -183,6 +183,12 @@ export function renameExercise(state: DataState, ctx: Ctx, args: { date: DateStr
   return editExercise(state, ctx, args.date, { kind: 'rename', position: args.position, from, name });
 }
 
+/** How many sets deleting the exercise at this position would remove; only a day's log holds sets. */
+export function setsLostOnDelete(state: DataState, date: DateStr, position: number): number {
+  const target = loggedExercises(state, date)?.[position];
+  return target ? (getIndex(state).setsByExercise.get(target.id)?.length ?? 0) : 0;
+}
+
 export function deleteExercise(state: DataState, ctx: Ctx, args: { date: DateStr; position: number }): Change[] {
   const from = dayExercises(state, args.date)[args.position]?.name ?? '';
   return editExercise(state, ctx, args.date, { kind: 'delete', position: args.position, from });

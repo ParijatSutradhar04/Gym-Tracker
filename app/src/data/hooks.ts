@@ -25,6 +25,12 @@ export function useActions(): Actions {
   return useMemo(() => createActions(store, () => todayLocal(new Date())), [store]);
 }
 
+/** The last save failure, or null once every change is saved. */
+export function useSaveError(): Error | null {
+  const store = useGymStore();
+  return useSyncExternalStore(store.subscribe, () => store.lastError);
+}
+
 export function useLayout(): { isDesktop: boolean } {
   const { width } = useWindowDimensions();
   return { isDesktop: width >= 900 };

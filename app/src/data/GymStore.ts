@@ -16,13 +16,15 @@ import type { DataStore } from './DataStore';
 
 /**
  * The app's single source of state. Dispatch is optimistic: memory and subscribers update at once,
- * and writes go to the DataStore one at a time, in dispatch order.
+ * and writes go to the DataStore one at a time, in dispatch order. Changes a write failed to save
+ * ride along with the next write (or `retry`); `lastError` stays set until they are saved.
  */
 export class GymStore {
   lastError: Error | null = null;
   private state: DataState = emptyState();
   private listeners = new Set<() => void>();
   private chain: Promise<void> = Promise.resolve();
+  private unsaved: Change[] = [];
 
   constructor(
     private readonly store: DataStore,
@@ -51,17 +53,37 @@ export class GymStore {
     if (changes.length === 0) return;
     this.state = applyChanges(this.state, changes);
     this.notify();
-    this.chain = this.chain
-      .then(() => this.store.commit(changes))
-      .catch((err: unknown) => {
-        this.lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn('GymStore: saving changes failed', err);
-      });
+    this.save(changes);
+  }
+
+  /** Tries again to save the changes earlier writes failed to save. */
+  retry(): void {
+    this.save([]);
   }
 
   /** Resolves once every write dispatched so far has settled. */
   whenIdle(): Promise<void> {
     return this.chain;
+  }
+
+  private save(changes: readonly Change[]): void {
+    this.chain = this.chain.then(async () => {
+      const batch = [...this.unsaved, ...changes];
+      if (batch.length === 0) return;
+      try {
+        await this.store.commit(batch);
+        this.unsaved = [];
+        if (this.lastError) {
+          this.lastError = null;
+          this.notify();
+        }
+      } catch (err: unknown) {
+        this.unsaved = batch;
+        this.lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn('GymStore: saving changes failed', err);
+        this.notify();
+      }
+    });
   }
 
   private notify(): void {

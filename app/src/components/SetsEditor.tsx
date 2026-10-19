@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useActions, useCtx, useGymState } from '../data/hooks';
 import { formatKg, type DateStr } from '../engine/dates';
 import { getSetsSheet, parseRepsInput, parseWeightInput, type SetDraft } from '../engine/sets';
+import { EngineError } from '../engine/types';
 import { colors } from '../theme';
 import { Button } from './Button';
 import { Icon } from './icons';
@@ -38,12 +39,29 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
   const state = useGymState();
   const ctx = useCtx();
   const actions = useActions();
-  const [info] = useState(() => getSetsSheet(state, ctx, date, position));
-  const [rows, setRows] = useState<Row[]>(() => info.rows.map(toRow));
-  const locked = readOnly || info.readOnly;
+  const [info] = useState(() => {
+    try {
+      return getSetsSheet(state, ctx, date, position);
+    } catch (e) {
+      if (e instanceof EngineError) return null; // the exercise is no longer on this day
+      throw e;
+    }
+  });
+  const [rows, setRows] = useState<Row[]>(() => info?.rows.map(toRow) ?? []);
+  const [failed, setFailed] = useState(false);
+  const locked = readOnly || !info || info.readOnly || failed;
 
-  const sync = (next: Row[], includeUntouched: boolean) =>
-    actions.syncSets({ date, position, rows: next.map((r) => r.draft), includeUntouched });
+  /** False when the engine refuses (the day or exercise changed under the editor); the editor then locks. */
+  const sync = (next: Row[], includeUntouched: boolean): boolean => {
+    try {
+      actions.syncSets({ date, position, rows: next.map((r) => r.draft), includeUntouched });
+      return true;
+    } catch (e) {
+      if (!(e instanceof EngineError)) throw e;
+      setFailed(true);
+      return false;
+    }
+  };
 
   const commit = (next: Row[]) => {
     setRows(next);
@@ -68,9 +86,12 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
   };
 
   const done = () => {
-    sync(rows, true);
-    onDone?.();
+    if (sync(rows, true)) onDone?.();
   };
+
+  if (!info) {
+    return <Text className="font-sans text-muted text-[14px] mt-2">This exercise is no longer on this day.</Text>;
+  }
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 640 }}>
@@ -122,7 +143,9 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
         ))}
       </View>
       {locked ? (
-        <Text className="font-sans text-muted text-[12px] mt-5 text-center">Sets can be logged on the day.</Text>
+        <Text className="font-sans text-muted text-[12px] mt-5 text-center">
+          {failed ? 'Could not save this change.' : 'Sets can be logged on the day.'}
+        </Text>
       ) : (
         <View className="gap-3 mt-5">
           <Pressable
