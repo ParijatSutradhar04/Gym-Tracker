@@ -9,19 +9,23 @@ interface Props {
   day: DayView;
   onAdd: () => void;
   onChange: () => void;
+  onBackfill: () => void;
+  onRestore: (shiftId: string) => void;
 }
 
-export function ScheduleBanner({ day, onAdd, onChange }: Props) {
+export function ScheduleBanner({ day, onAdd, onChange, onBackfill, onRestore }: Props) {
   const { routine } = day;
   if (!routine) {
-    if (!day.canEditSchedule) return null;
+    if (!day.canEditSchedule && !day.canBackfill) return null;
     return (
       <Pressable
         accessibilityRole="button"
-        onPress={onAdd}
+        onPress={day.canBackfill ? onBackfill : onAdd}
         className="h-[104px] rounded-[16px] bg-surface items-center justify-center"
       >
-        <Text className="font-sans-semibold text-accent text-[16px]">+ Add Schedule</Text>
+        <Text className="font-sans-semibold text-accent text-[16px]">
+          {day.canBackfill ? 'Log a workout' : '+ Add Schedule'}
+        </Text>
       </Pressable>
     );
   }
@@ -33,11 +37,11 @@ export function ScheduleBanner({ day, onAdd, onChange }: Props) {
         <Text className="font-sans-medium text-ink text-[22px] flex-1" numberOfLines={2}>
           {routine.title}
         </Text>
-        {editable ? (
-          <ChangeButton onPress={onChange} />
-        ) : day.status ? (
+        {day.status ? (
           <Badge tone={day.status} label={day.status === 'missed' ? 'Missed' : 'Skipped'} />
         ) : null}
+        {day.restoreShiftId ? <RestoreButton onPress={() => onRestore(day.restoreShiftId!)} /> : null}
+        {editable ? <ChangeButton onPress={onChange} /> : null}
       </View>
       {editable && rule ? (
         <Pressable accessibilityRole="button" onPress={onChange} className="flex-row items-center gap-2 mt-4 self-start">
@@ -58,6 +62,18 @@ function ChangeButton({ onPress }: { onPress: () => void }) {
       className="h-8 px-4 rounded-[8px] bg-surface-2 items-center justify-center"
     >
       <Text className="font-sans-semibold text-ink text-[13px]">Change</Text>
+    </Pressable>
+  );
+}
+
+function RestoreButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="h-8 px-4 rounded-[8px] bg-surface-2 items-center justify-center"
+    >
+      <Text className="font-sans-semibold text-ink text-[13px]">Restore</Text>
     </Pressable>
   );
 }
