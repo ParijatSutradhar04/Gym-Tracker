@@ -1,23 +1,23 @@
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 import { useCtx, useGymState } from '../data/hooks';
 import type { DateStr } from '../engine/dates';
 import { getDay } from '../engine/dayView';
 import { colors } from '../theme';
 import { Icon } from './icons';
+import { ScheduleBanner } from './ScheduleBanner';
+import { ScheduleSheet } from './ScheduleSheet';
 
 export function DayBody({ date }: { date: DateStr }) {
   const state = useGymState();
   const ctx = useCtx();
   const day = getDay(state, ctx, date);
-  if (day.canEditSchedule && !day.routine) {
-    return (
-      <View className="px-5">
-        <Pressable
-          accessibilityRole="button"
-          className="h-[104px] rounded-[16px] bg-surface items-center justify-center"
-        >
-          <Text className="font-sans-semibold text-accent text-[16px]">+ Add Schedule</Text>
-        </Pressable>
+  const [scheduleMode, setScheduleMode] = useState<'add' | 'change' | null>(null);
+  const empty = day.canEditSchedule && !day.routine;
+  return (
+    <View className="px-5">
+      <ScheduleBanner day={day} onAdd={() => setScheduleMode('add')} onChange={() => setScheduleMode('change')} />
+      {empty ? (
         <View className="items-center mt-16 px-4">
           <View className="w-[72px] h-[72px] rounded-[20px] bg-surface items-center justify-center">
             <Icon name="CalendarPlus" size={28} color={colors.accent} />
@@ -30,8 +30,14 @@ export function DayBody({ date }: { date: DateStr }) {
             YOUR NEXT REP STARTS WITH A PLAN
           </Text>
         </View>
-      </View>
-    );
-  }
-  return null;
+      ) : null}
+      <ScheduleSheet
+        mode={scheduleMode ?? 'add'}
+        date={date}
+        day={day}
+        visible={scheduleMode !== null}
+        onClose={() => setScheduleMode(null)}
+      />
+    </View>
+  );
 }
