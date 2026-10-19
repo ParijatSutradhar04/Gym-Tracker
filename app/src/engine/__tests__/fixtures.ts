@@ -4,7 +4,8 @@ import { addDays, eachDay, type DateStr } from '../dates';
 import { applyChanges, getIndex } from '../state';
 import { dayExercises } from '../dayLog';
 import { scheduleBetween } from '../schedule';
-import { normalizeName, syncSets } from '../sets';
+import { normalizeName } from '../names';
+import { syncSets } from '../sets';
 
 /** Ids id-(startSeq+1), id-(startSeq+2)…; a clock from noon UTC on `today` plus clockOffsetMs, 1 ms per call. */
 export function makeCtx(today: DateStr, startSeq = 0, clockOffsetMs = 0): Ctx {

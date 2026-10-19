@@ -47,6 +47,9 @@ def get_current_user(request: Request) -> dict:
             algorithms=["ES256"],
             audience="authenticated",
         )
+    except jwt.PyJWKClientConnectionError as exc:
+        # Fetching the keys failed, which says nothing about the token: a 5xx is retried, a 401 means sign in again.
+        raise HTTPException(status_code=503, detail="Could not fetch the signing keys") from exc
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail=f"Invalid token: {exc}") from exc
 

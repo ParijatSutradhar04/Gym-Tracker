@@ -24,6 +24,7 @@ export function SyncRuntime({ data: outbox, gym, children }: Props) {
         api: createSyncApi({ baseUrl: API_BASE, tokens: supabaseTokenSource }),
         cursor: createCursorStore(asyncStorageAdapter),
         apply: (changes) => gym.applyRemote(changes),
+        restamp: (after, now) => gym.restamp(after, now),
         now: () => Date.now(),
       }),
   );

@@ -99,6 +99,7 @@ export interface Ctx {
 
 export type EngineErrorCode =
   | 'EMPTY_NAME'
+  | 'NAME_TOO_LONG'
   | 'READ_ONLY_FUTURE'
   | 'NOT_EDITABLE_PAST'
   | 'NO_ROUTINE'

@@ -10,7 +10,7 @@ import {
 } from '../engine/scheduleEdits';
 import { syncSets } from '../engine/sets';
 import { restoreShift, shiftToday, skipToday } from '../engine/shift';
-import { applyChanges, emptyState, mergeRemote } from '../engine/state';
+import { applyChanges, emptyState, mergeRemote, restampRows } from '../engine/state';
 import type { Change, Ctx, DataState } from '../engine/types';
 import type { DataStore } from './DataStore';
 
@@ -82,6 +82,28 @@ export class GymStore {
     const saved = this.chain.then(() => this.saveRemote(accepted));
     this.chain = saved.catch(() => {});
     return saved;
+  }
+
+  /**
+   * Puts every row stamped after `after` to `now`, here and in the store, ignoring last-write-wins: rows a
+   * device clock stamped while it ran fast would otherwise beat every edit until real time caught up. A
+   * queued change to such a row becomes the row's current version, so whichever copy reaches the server
+   * first already holds the last edit. Runs after the writes queued before it; rejects if saving fails.
+   */
+  restamp(after: string, now: string): Promise<void> {
+    const fresh = restampRows(this.state, after, now);
+    if (fresh.length > 0) {
+      this.state = applyChanges(this.state, fresh);
+      this.notify();
+    }
+    this.unsaved = this.unsaved.map((c) =>
+      c.row.updatedAt > after
+        ? ({ table: c.table, row: (this.state[c.table] as Map<string, Change['row']>).get(c.row.id) ?? { ...c.row, updatedAt: now } } as Change)
+        : c,
+    );
+    const done = this.chain.then(() => this.store.restamp?.(after, now));
+    this.chain = done.catch(() => {});
+    return done;
   }
 
   /** Tries again to save the changes earlier writes failed to save. */

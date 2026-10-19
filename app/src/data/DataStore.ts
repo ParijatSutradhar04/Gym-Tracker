@@ -16,6 +16,8 @@ export interface DataStore {
   commit(changes: readonly Change[]): Promise<void>;
   /** Merges server rows last-write-wins. Never touches the outbox. */
   applyRemote(changes: readonly Change[]): Promise<void>;
+  /** The phone's store only: see GymStore.restamp. */
+  restamp?(after: string, now: string): Promise<void>;
 }
 
 export interface OutboxApi {

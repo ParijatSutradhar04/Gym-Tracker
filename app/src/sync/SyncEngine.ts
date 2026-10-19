@@ -49,6 +49,8 @@ export class SyncEngine {
       api: SyncApi;
       cursor: CursorStore;
       apply(changes: Change[]): Promise<void>;
+      /** Puts every local row and queued change stamped after `after` to `now`; resolves once saved. */
+      restamp(after: string, now: string): Promise<void>;
       now(): number;
     },
   ) {
@@ -100,10 +102,14 @@ export class SyncEngine {
     let synced = false;
     try {
       const { serverTime } = await this.pull();
-      if (serverTime !== null && Math.abs(this.deps.now() - Date.parse(serverTime)) > MAX_CLOCK_SKEW_MS) {
+      const now = this.deps.now();
+      const serverMs = serverTime === null ? now : Date.parse(serverTime);
+      if (Math.abs(now - serverMs) > MAX_CLOCK_SKEW_MS) {
         phase = 'clock_skew';
         lastError = 'The device clock is more than 5 minutes off the server clock';
       } else {
+        // Rows stamped while the clock ran fast, before it was put right, would beat every edit made since.
+        await this.deps.restamp(new Date(serverMs + MAX_CLOCK_SKEW_MS).toISOString(), new Date(now).toISOString());
         const { pushed, reasons } = await this.pushAll();
         if (pushed) await this.pull();
         phase = 'idle';

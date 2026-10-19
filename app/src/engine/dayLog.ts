@@ -1,5 +1,6 @@
 import type { DateStr } from './dates';
 import { stableId } from './ids';
+import { normalizeName, requireName } from './names';
 import { scheduleOn, versionAt } from './schedule';
 import { getIndex } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type Day, type DayExercise } from './types';
@@ -25,8 +26,10 @@ export function dayExercises(state: DataState, date: DateStr): DayExerciseItem[]
 
 /**
  * Creates the day log (title + exercise snapshot) if the date has none. The day and each snapshotted
- * exercise (`date|index`) get derived ids, so a second device snapshotting the same date writes the same
- * rows; a tombstone left under one of those ids is simply overwritten by the newer live row.
+ * exercise get derived ids, so a second device snapshotting the same date writes the same rows; a tombstone
+ * left under one of those ids is simply overwritten by the newer live row. An exercise's id comes from its
+ * name and which occurrence of that name it is (`date|name|k`), not its index: two devices snapshotting
+ * different lists must not merge one device's exercise, and its sets, into another's.
  */
 export function ensureDayLog(state: DataState, ctx: Ctx, date: DateStr): Change[] {
   const day = getIndex(state).dayByDate.get(date);
@@ -52,17 +55,21 @@ export function ensureDayLog(state: DataState, ctx: Ctx, date: DateStr): Change[
     throw new EngineError('NO_ROUTINE');
   }
   const now = ctx.now();
+  const seen = new Map<string, number>();
   const dayRow: Day = day
     ? { ...day, routineId, title, hasLog: true, updatedAt: now }
     : { id: stableId('day', date), updatedAt: now, deletedAt: null, date, status: null, shiftId: null, routineId, title, hasLog: true };
   return [
     { table: 'days', row: dayRow },
-    ...exercises.map(
-      (name, position): Change => ({
+    ...exercises.map((name, position): Change => {
+      const key = normalizeName(name);
+      const k = seen.get(key) ?? 0;
+      seen.set(key, k + 1);
+      return {
         table: 'day_exercises',
-        row: { id: stableId('day_exercise', `${date}|${position}`), updatedAt: now, deletedAt: null, date, position, name },
-      }),
-    ),
+        row: { id: stableId('day_exercise', `${date}|${key}|${k}`), updatedAt: now, deletedAt: null, date, position, name },
+      };
+    }),
   ];
 }
 
@@ -71,8 +78,7 @@ export function startBackfill(state: DataState, ctx: Ctx, args: { date: DateStr;
   const { date } = args;
   const day = getIndex(state).dayByDate.get(date);
   if (date >= ctx.today || day?.hasLog || scheduleOn(state, date) !== null) throw new EngineError('NOT_AVAILABLE');
-  const title = args.title.trim();
-  if (!title) throw new EngineError('EMPTY_NAME');
+  const title = requireName(args.title);
   const now = ctx.now();
   const row: Day = day
     ? { ...day, routineId: null, title, hasLog: true, updatedAt: now }

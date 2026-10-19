@@ -139,6 +139,7 @@ async function setup(api?: (server: FakeServer) => SyncApi) {
       applied.push(...changes);
       await local.applyRemote(changes);
     },
+    restamp: (after, now) => local.restamp(after, now),
     now: () => clock.ms,
   });
   return { storage, local, server, engine, applied, clock };
@@ -334,6 +335,27 @@ describe('SyncEngine', () => {
     expect(server.calls).toEqual(['pull', 'pull', 'push', 'pull']);
     expect(await local.count()).toBe(0);
     expect(engine.getStatus().phase).toBe('idle');
+  });
+
+  // A clock two hours fast stamped s1 and was then put right. Pushed as stamped, s1 would beat every edit
+  // made anywhere for the next two hours.
+  test('fast_clock_row_is_restamped_before_push', async () => {
+    const { storage, local, server, engine } = await setup();
+    const others = Array.from({ length: 249 }, (_, i) => set(`s${i + 2}`, 1));
+    await local.commit([set('s1', 1, iso(NOW + 2 * 3600_000)), ...others]);
+    await local.commit([set('s1', 2, iso(NOW + 2 * 3600_000 + 1))]);
+
+    await engine.syncOnce();
+
+    // s1 is queued in both batches; each copy must carry the last edit, or the first to land would stick.
+    expect(server.pushes.map((p) => p.length)).toEqual([200, 51]);
+    expect(server.rows.get('sets:s1')?.change.row).toMatchObject({ reps: 2, updatedAt: iso(NOW) });
+
+    // The website edits s1 a second later, and that edit wins here too.
+    server.seed(set('s1', 5, iso(NOW + 1000)));
+    await engine.syncOnce();
+    const reloaded = new LocalStore(storage, { newId: () => 'x', now: () => iso(NOW) });
+    expect((await reloaded.load()).sets.get('s1')).toMatchObject({ reps: 5, updatedAt: iso(NOW + 1000) });
   });
 
   test('edit_made_during_a_push_survives_the_ack', async () => {

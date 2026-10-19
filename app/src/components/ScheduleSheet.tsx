@@ -4,6 +4,7 @@ import { useActions, useCtx, useGymState } from '../data/hooks';
 import { clashWarning, previewClashes } from '../engine/clash';
 import { MONTH_NAMES, type DateStr } from '../engine/dates';
 import type { DayView } from '../engine/dayView';
+import { MAX_NAME_LENGTH } from '../engine/names';
 import { REPEAT_LABELS } from '../engine/repeat';
 import { routineTitleSuggestions } from '../engine/scheduleEdits';
 import { EngineError, type RepeatRule } from '../engine/types';
@@ -89,6 +90,7 @@ function ScheduleForm({ mode, date, day, onClose }: Omit<Props, 'visible'>) {
       </Text>
       <TextInput
         value={title}
+        maxLength={MAX_NAME_LENGTH}
         onChangeText={(t) => {
           setTitle(t);
           setPicked(null);

@@ -1,15 +1,9 @@
 import type { DateStr } from './dates';
 import { dayExercises, ensureDayLog, loggedExercises } from './dayLog';
+import { normalizeName, requireName } from './names';
 import { scheduleOn, versionAt } from './schedule';
-import { normalizeName } from './sets';
 import { createRecorder, getIndex, liveRows } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type RepeatRule, type RoutineVersion } from './types';
-
-function requireName(name: string): string {
-  const t = name.trim();
-  if (!t) throw new EngineError('EMPTY_NAME');
-  return t;
-}
 
 function requireEditable(ctx: Ctx, date: DateStr): void {
   if (date < ctx.today) throw new EngineError('NOT_EDITABLE_PAST');

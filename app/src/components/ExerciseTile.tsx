@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import type { ExerciseView } from '../engine/dayView';
+import { MAX_NAME_LENGTH } from '../engine/names';
 import { accentTint, colors } from '../theme';
 import { Icon } from './icons';
 
@@ -40,6 +41,7 @@ export function ExerciseTile({ exercise, selected, onPress, onRename, onDelete }
         <TextInput
           autoFocus
           value={draft}
+          maxLength={MAX_NAME_LENGTH}
           onChangeText={setDraft}
           onSubmitEditing={() => finish(true)}
           onBlur={() => finish(true)}

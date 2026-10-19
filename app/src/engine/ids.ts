@@ -32,7 +32,7 @@ function cyrb128(s: string): [number, number, number, number] {
   return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
 }
 
-/** Lowercase UUID for a day (`date`), a snapshotted day exercise (`date|index`) or a set (`dayExerciseId|setNumber`). */
+/** Lowercase UUID for a day (`date`), a snapshotted day exercise (`date|name|occurrence`) or a set (`dayExerciseId|setNumber`). */
 export function stableId(kind: StableKind, key: string): string {
   const hex = cyrb128(kind + ':' + key)
     .map((h) => h.toString(16).padStart(8, '0'))

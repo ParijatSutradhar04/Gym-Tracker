@@ -3,6 +3,7 @@ import { Text, TextInput, View } from 'react-native';
 import { useActions, useGymState } from '../data/hooks';
 import { formatCount, type DateStr } from '../engine/dates';
 import type { DayView, ExerciseView } from '../engine/dayView';
+import { MAX_NAME_LENGTH } from '../engine/names';
 import { setsLostOnDelete } from '../engine/scheduleEdits';
 import { EngineError } from '../engine/types';
 import { colors } from '../theme';
@@ -72,6 +73,7 @@ export function ExerciseList({ day, selectedPosition, onSelect, hint }: Props) {
         ))}
         <TextInput
           value={name}
+          maxLength={MAX_NAME_LENGTH}
           onChangeText={setName}
           onSubmitEditing={add}
           placeholder="+ Type exercise name…"

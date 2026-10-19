@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useActions } from '../data/hooks';
 import { MONTH_NAMES, type DateStr } from '../engine/dates';
+import { MAX_NAME_LENGTH } from '../engine/names';
 import { EngineError } from '../engine/types';
 import { colors } from '../theme';
 import { Button } from './Button';
@@ -49,6 +50,7 @@ function BackfillForm({ date, onClose }: Omit<Props, 'visible'>) {
       </Text>
       <TextInput
         value={title}
+        maxLength={MAX_NAME_LENGTH}
         onChangeText={(t) => {
           setTitle(t);
           setError(null);

@@ -1,4 +1,4 @@
-import { applyChanges, emptyState, mergeRemote, TABLES } from '../engine/state';
+import { applyChanges, emptyState, mergeRemote, restampRows, TABLES } from '../engine/state';
 import type { BaseRow, Change, DataState, TableName } from '../engine/types';
 import { StoreCorruptError, type DataStore, type OutboxApi, type OutboxEntry } from './DataStore';
 import type { KeyValueStorage } from './storage';
@@ -109,6 +109,24 @@ export class LocalStore implements DataStore, OutboxApi {
     await this.write(accepted, [], this.outboxSeq);
   }
 
+  /**
+   * Restamps every stored row stamped after `after` to `now`, and points every outbox entry stamped after
+   * `after` at its row's current version, in place and in one write. See GymStore.restamp.
+   */
+  async restamp(after: string, now: string): Promise<void> {
+    this.ensureLoaded();
+    const rows = restampRows(this.state, after, now);
+    const latest = applyChanges(this.state, rows);
+    const rewritten = this.outbox
+      .filter((e) => e.change.row.updatedAt > after)
+      .map((e): OutboxEntry => {
+        const row = (latest[e.table] as Map<string, BaseRow>).get(e.rowId) ?? { ...e.change.row, updatedAt: now };
+        return { ...e, change: { table: e.table, row } as Change };
+      });
+    if (rows.length === 0 && rewritten.length === 0) return;
+    await this.write(rows, [], this.outboxSeq, rewritten);
+  }
+
   async peek(limit: number): Promise<OutboxEntry[]> {
     return this.outbox.slice(0, limit);
   }
@@ -133,8 +151,11 @@ export class LocalStore implements DataStore, OutboxApi {
     };
   }
 
-  /** One multiSet of touched buckets, meta and new outbox keys. Memory changes only after it succeeds. */
-  private async write(changes: readonly Change[], entries: OutboxEntry[], seq: number): Promise<void> {
+  /**
+   * One multiSet of touched buckets, meta, new outbox keys and `rewritten` entries (same keys, new contents).
+   * Memory changes only after it succeeds.
+   */
+  private async write(changes: readonly Change[], entries: OutboxEntry[], seq: number, rewritten: OutboxEntry[] = []): Promise<void> {
     const touched = new Map<string, Map<string, BaseRow>>();
     for (const c of changes) {
       const key = rowKey(c.table, c.row.id);
@@ -147,11 +168,12 @@ export class LocalStore implements DataStore, OutboxApi {
     }
     const pairs: [string, string][] = [...touched].map(([key, rows]) => [key, JSON.stringify([...rows.values()])]);
     pairs.push([META_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, outboxSeq: seq } satisfies Meta)]);
-    for (const e of entries) pairs.push([obKey(e.seq), JSON.stringify(e)]);
+    for (const e of [...entries, ...rewritten]) pairs.push([obKey(e.seq), JSON.stringify(e)]);
     await this.storage.multiSet(pairs);
     for (const [key, rows] of touched) this.buckets.set(key, rows);
     this.state = applyChanges(this.state, changes);
-    this.outbox = this.outbox.concat(entries);
+    const swap = new Map(rewritten.map((e) => [e.id, e]));
+    this.outbox = this.outbox.map((e) => swap.get(e.id) ?? e).concat(entries);
     this.outboxSeq = seq;
   }
 

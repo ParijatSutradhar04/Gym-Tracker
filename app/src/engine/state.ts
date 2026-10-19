@@ -63,6 +63,18 @@ export function mergeRemote(state: DataState, changes: readonly Change[]): { sta
   return { state: applyChanges(state, accepted), accepted };
 }
 
+/**
+ * Every row stamped after `after`, restamped to `now`, tombstones included. A device clock that ran fast
+ * leaves rows that would otherwise win every merge until real time caught up.
+ */
+export function restampRows(state: DataState, after: string, now: string): Change[] {
+  return TABLES.flatMap((table) =>
+    [...(state[table] as Map<string, Change['row']>).values()]
+      .filter((row) => row.updatedAt > after)
+      .map((row) => ({ table, row: { ...row, updatedAt: now } }) as Change),
+  );
+}
+
 export interface Recorder {
   state(): DataState;
   apply(changes: Change[]): void;

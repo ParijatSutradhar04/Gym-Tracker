@@ -15,6 +15,7 @@ import { SyncStatusSlot } from '../components/SyncStatusSlot';
 import { useActions, useCtx, useGymState, useToday } from '../data/hooks';
 import { MONTH_NAMES, WEEKDAY_FULL, WEEKDAY_SHORT, weekdayIndex, type DateStr } from '../engine/dates';
 import { getDay, type DayView } from '../engine/dayView';
+import { MAX_NAME_LENGTH } from '../engine/names';
 import { EngineError } from '../engine/types';
 import { colors } from '../theme';
 
@@ -216,6 +217,7 @@ function PanelTitle({ name, onRename }: { name: string; onRename: (name: string)
         <TextInput
           autoFocus
           value={draft}
+          maxLength={MAX_NAME_LENGTH}
           onChangeText={setDraft}
           onSubmitEditing={() => finish(true)}
           onBlur={() => finish(true)}

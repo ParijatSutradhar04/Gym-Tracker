@@ -68,6 +68,25 @@ describe('two devices converge', () => {
     }
   });
 
+  // The phone logs from the old list while the website has already taken an exercise out; each set must
+  // stay on the exercise it was logged against.
+  test('divergent_snapshots_keep_each_devices_sets', () => {
+    const { base, a, b } = twoDevices();
+    const onA = logSets(base, a, TODAY, 'Bench press', [[10, 60]]);
+    const withoutBench = run(base, deleteExercise(base, b, { date: TODAY, position: 0 }));
+    const onB = logSets(withoutBench, b, TODAY, 'Cable fly', [[12, 20]]);
+
+    const [mergedA, mergedB] = exchange(base, onA, onB);
+
+    expect(live(mergedA)).toEqual(live(mergedB));
+    for (const s of [mergedA, mergedB]) {
+      const list = names(s, a);
+      expect([...list].sort()).toEqual(['Bench press', 'Cable fly']);
+      expect(sets(s, list.indexOf('Bench press'))).toEqual([[1, 10, 60]]);
+      expect(sets(s, list.indexOf('Cable fly'))).toEqual([[1, 12, 20]]);
+    }
+  });
+
   test('skip_on_two_devices_leaves_one_day_row', () => {
     const { base, a, b } = twoDevices();
     const onA = run(base, skipToday(base, a));

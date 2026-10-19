@@ -1,9 +1,11 @@
 import httpx
+import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from fastapi import Depends, FastAPI
 
+from app import auth
 from app.auth import current_user_id
 from app.config import settings
 from tests.conftest import bearer
@@ -80,3 +82,16 @@ async def test_unset_supabase_url_is_500(whoami, make_token, user_a, monkeypatch
     monkeypatch.setattr(settings, "supabase_url", None)
     r = await whoami.get("/whoami", headers=bearer(make_token(user_a)))
     assert r.status_code == 500
+
+
+async def test_jwks_fetch_failure_is_503_not_401(whoami, make_token, user_a, monkeypatch):
+    # A blip fetching the signing keys says nothing about the token: clients retry a 5xx, but a 401 asks the
+    # user to sign in again.
+    class Unreachable:
+        def get_signing_key_from_jwt(self, token):
+            raise jwt.PyJWKClientConnectionError("Fail to fetch data from the url, err: timed out")
+
+    token = make_token(user_a)
+    monkeypatch.setattr(auth, "_get_jwk_client", lambda: Unreachable())
+    r = await whoami.get("/whoami", headers=bearer(token))
+    assert r.status_code == 503

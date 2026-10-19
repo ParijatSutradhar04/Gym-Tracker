@@ -167,6 +167,23 @@ describe('GymStore', () => {
     expect([...gym.getState().days.values()][0]).toMatchObject({ date: TODAY, status: 'skipped', title: 'Chest' });
   });
 
+  test('restamp_rewrites_future_rows_in_memory_and_on_disk_after_queued_writes', async () => {
+    const { storage, gym } = await opened();
+    gym.dispatch([set(at(14), 8)]); // stamped by a clock two hours fast
+    gym.dispatch([day('d1')]);
+
+    await gym.restamp(at(12, 5), at(12));
+
+    expect(gym.getState().sets.get('s1')).toMatchObject({ reps: 8, updatedAt: at(12) });
+    expect(gym.getState().days.get('d1')?.updatedAt).toBe(at(10));
+    const reloaded = new LocalStore(storage, deps('ob2'));
+    expect((await reloaded.load()).sets.get('s1')?.updatedAt).toBe(at(12));
+    expect((await reloaded.peek(10)).map((e) => [e.rowId, e.change.row.updatedAt])).toEqual([
+      ['s1', at(12)],
+      ['d1', at(10)],
+    ]);
+  });
+
   test('applyRemote_merges_notifies_and_persists_after_pending_commits', async () => {
     const { storage, local, gym } = await opened();
     const order: string[] = [];

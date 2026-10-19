@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dayExercises, ensureDayLog } from '../dayLog';
+import { dayExercises, ensureDayLog, startBackfill } from '../dayLog';
 import { scheduleOn } from '../schedule';
 import {
   addExercise,
@@ -185,6 +185,24 @@ describe('exercise edits', () => {
     expect(setsLostOnDelete(s, '2026-10-12', 1)).toBe(removed('2026-10-12', 1));
     expect(setsLostOnDelete(s, '2026-10-12', 1)).toBe(1);
     expect(setsLostOnDelete(s, '2026-10-26', 0)).toBe(0);
+  });
+
+  // The server turns down names over 200 characters, so one that got past here would never sync.
+  test('names_over_200_characters_rejected', () => {
+    const { ctx, s } = chest();
+    const long = 'x'.repeat(201);
+    expectCode(() => addSchedule(s, ctx, { date: '2026-10-20', title: long, repeatRule: 'weekly' }), 'NAME_TOO_LONG');
+    expectCode(
+      () => changeSchedule(s, ctx, { routineId: routineId(s, 'Chest & Tricep'), date: '2026-10-19', title: long, repeatRule: 'weekly' }),
+      'NAME_TOO_LONG',
+    );
+    expectCode(() => addExercise(s, ctx, { date: '2026-10-19', name: long }), 'NAME_TOO_LONG');
+    expectCode(() => renameExercise(s, ctx, { date: '2026-10-19', position: 0, name: long }), 'NAME_TOO_LONG');
+    expectCode(() => startBackfill(s, ctx, { date: '2026-10-14', title: long }), 'NAME_TOO_LONG');
+    // Characters as the server counts them (an emoji is one), after trimming.
+    const flex = '\u{1F4AA}'.repeat(200);
+    const s1 = run(s, addExercise(s, ctx, { date: '2026-10-19', name: ` ${flex} ` }));
+    expect(scheduleOn(s1, '2026-10-19')?.exercises[2]).toBe(flex);
   });
 
   test('position_out_of_range_throws_NOT_FOUND', () => {

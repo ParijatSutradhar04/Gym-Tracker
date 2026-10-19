@@ -1,6 +1,7 @@
 import type { DateStr } from './dates';
 import { dayExercises, ensureDayLog, loggedExercises } from './dayLog';
 import { stableId } from './ids';
+import { normalizeName } from './names';
 import { scheduleOn } from './schedule';
 import { createRecorder, getIndex } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type SetRow } from './types';
@@ -14,10 +15,6 @@ export interface SetDraft {
 const EMPTY_ROWS = 3;
 const MAX_REPS = 999;
 const MAX_KG = 1000;
-
-export function normalizeName(s: string): string {
-  return s.trim().toLowerCase();
-}
 
 /** Live sets of the exercise at `position` on a logged day; [] when the day has no log. */
 export function persistedSets(state: DataState, date: DateStr, position: number): SetRow[] {
