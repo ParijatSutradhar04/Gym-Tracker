@@ -6,10 +6,11 @@ import { dayExercises } from '../dayLog';
 import { scheduleBetween } from '../schedule';
 import { normalizeName, syncSets } from '../sets';
 
-export function makeCtx(today: DateStr, startSeq = 0): Ctx {
+/** Ids id-(startSeq+1), id-(startSeq+2)…; a clock from noon UTC on `today` plus clockOffsetMs, 1 ms per call. */
+export function makeCtx(today: DateStr, startSeq = 0, clockOffsetMs = 0): Ctx {
   let seq = startSeq;
   let ms = 0;
-  const base = Date.parse(today + 'T12:00:00.000Z');
+  const base = Date.parse(today + 'T12:00:00.000Z') + clockOffsetMs;
   return {
     today,
     newId: () => `id-${++seq}`,

@@ -1,4 +1,5 @@
 import type { DateStr } from './dates';
+import { stableId } from './ids';
 import { scheduleOn, versionAt } from './schedule';
 import { getIndex } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type Day, type DayExercise } from './types';
@@ -22,7 +23,11 @@ export function dayExercises(state: DataState, date: DateStr): DayExerciseItem[]
   return names.map((name, position) => ({ position, name }));
 }
 
-/** Creates the day log (title + exercise snapshot) if the date has none. */
+/**
+ * Creates the day log (title + exercise snapshot) if the date has none. The day and each snapshotted
+ * exercise (`date|index`) get derived ids, so a second device snapshotting the same date writes the same
+ * rows; a tombstone left under one of those ids is simply overwritten by the newer live row.
+ */
 export function ensureDayLog(state: DataState, ctx: Ctx, date: DateStr): Change[] {
   const day = getIndex(state).dayByDate.get(date);
   if (day?.hasLog) return [];
@@ -49,13 +54,13 @@ export function ensureDayLog(state: DataState, ctx: Ctx, date: DateStr): Change[
   const now = ctx.now();
   const dayRow: Day = day
     ? { ...day, routineId, title, hasLog: true, updatedAt: now }
-    : { id: ctx.newId(), updatedAt: now, deletedAt: null, date, status: null, shiftId: null, routineId, title, hasLog: true };
+    : { id: stableId('day', date), updatedAt: now, deletedAt: null, date, status: null, shiftId: null, routineId, title, hasLog: true };
   return [
     { table: 'days', row: dayRow },
     ...exercises.map(
       (name, position): Change => ({
         table: 'day_exercises',
-        row: { id: ctx.newId(), updatedAt: now, deletedAt: null, date, position, name },
+        row: { id: stableId('day_exercise', `${date}|${position}`), updatedAt: now, deletedAt: null, date, position, name },
       }),
     ),
   ];
@@ -71,6 +76,6 @@ export function startBackfill(state: DataState, ctx: Ctx, args: { date: DateStr;
   const now = ctx.now();
   const row: Day = day
     ? { ...day, routineId: null, title, hasLog: true, updatedAt: now }
-    : { id: ctx.newId(), updatedAt: now, deletedAt: null, date, status: null, shiftId: null, routineId: null, title, hasLog: true };
+    : { id: stableId('day', date), updatedAt: now, deletedAt: null, date, status: null, shiftId: null, routineId: null, title, hasLog: true };
   return [{ table: 'days', row }];
 }

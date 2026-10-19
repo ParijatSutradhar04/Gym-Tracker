@@ -1,5 +1,6 @@
 import type { DateStr } from './dates';
 import { dayExercises, ensureDayLog, loggedExercises } from './dayLog';
+import { stableId } from './ids';
 import { scheduleOn } from './schedule';
 import { createRecorder, getIndex } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type SetRow } from './types';
@@ -83,7 +84,9 @@ export function getSetsSheet(state: DataState, ctx: Ctx, date: DateStr, position
 
 /**
  * Makes the persisted sets match `rows` (row i = set i+1). Untouched rows are only written when
- * includeUntouched (Done). Creates the day log lazily, so peeking at a sheet saves nothing.
+ * includeUntouched (Done). Creates the day log lazily, so peeking at a sheet saves nothing. Set numbers
+ * are positions, renumbered on every sync, so a new set's id is derived from `dayExerciseId|setNumber`:
+ * two devices logging the same set write one row, and a cleared then re-logged set revives its tombstone.
  */
 export function syncSets(
   state: DataState,
@@ -119,7 +122,7 @@ export function syncSets(
       table: 'sets',
       row: prev
         ? { ...prev, reps: row.reps, weightKg: row.weightKg, updatedAt: now }
-        : { id: ctx.newId(), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg },
+        : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg },
     })),
   );
   return rec.changes();
