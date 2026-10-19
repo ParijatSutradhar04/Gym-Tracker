@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { AppState, Text, View } from 'react-native';
+import { LoadFailedScreen } from '../components/LoadFailedScreen';
 import { msUntilNextMidnight, todayLocal, type DateStr } from '../engine/dates';
+import { HttpError, NetworkError } from '../sync/api';
 import { SyncRuntime } from '../sync/SyncRuntime';
 import { GymStore } from './GymStore';
 import { newId, nowIso } from './ids';
@@ -48,23 +50,42 @@ export function GymProvider({ children }: { children: ReactNode }) {
   });
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  // Bumped by Retry on the website's load-failed screen to load again.
+  const [attempt, setAttempt] = useState(0);
+  const [retrying, setRetrying] = useState(false);
   const today = useTodayClock();
   useEffect(() => {
     let live = true;
     store.init().then(
-      () => live && setReady(true),
-      (e: unknown) => live && setError(e instanceof Error ? e : new Error(String(e))),
+      () => {
+        if (!live) return;
+        setError(null);
+        setReady(true);
+      },
+      (e: unknown) => {
+        if (!live) return;
+        setError(e instanceof Error ? e : new Error(String(e)));
+        setRetrying(false);
+      },
     );
     return () => {
       live = false;
     };
-  }, [store]);
+  }, [store, attempt]);
+  // The server could not be reached or failed; asking again may work. (Only the website loads from the server.)
+  if (error instanceof NetworkError || error instanceof HttpError) {
+    const retry = () => {
+      setRetrying(true);
+      setAttempt((a) => a + 1);
+    };
+    return <LoadFailedScreen message={error.message} retrying={retrying} onRetry={retry} />;
+  }
   if (error) return <LoadErrorScreen message={error.message} />;
   if (!ready) return null;
   return (
     <StoreContext.Provider value={store}>
       <TodayContext.Provider value={today}>
-        <SyncRuntime outbox={data} gym={store}>
+        <SyncRuntime data={data} gym={store}>
           {children}
         </SyncRuntime>
       </TodayContext.Provider>

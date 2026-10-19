@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { hasLocalData, resolveGate } from './src/auth/gate';
+import { ConnectivityShell } from './src/components/ConnectivityShell';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { GymProvider } from './src/data/GymProvider';
 import { useGymState } from './src/data/hooks';
@@ -38,7 +39,9 @@ function WebGate() {
   if (resolveGate({ platform: 'web', hasStoredSession, hasLocalData: false }) === 'login') return <LoginScreen />;
   return (
     <GymProvider>
-      <HomeScreen />
+      <ConnectivityShell>
+        <HomeScreen />
+      </ConnectivityShell>
     </GymProvider>
   );
 }

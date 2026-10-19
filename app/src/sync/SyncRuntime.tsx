@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppState, Modal, Platform } from 'react-native';
+import { AppState, Modal } from 'react-native';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase, supabaseTokenSource } from '../auth/supabase';
 import type { DataStore, OutboxApi } from '../data/DataStore';
@@ -12,12 +12,10 @@ import { createScheduler } from './scheduler';
 import { SyncEngine } from './SyncEngine';
 import { SyncContext, type SyncHandle } from './useSyncStatus';
 
-type Props = { outbox: DataStore & OutboxApi; gym: GymStore; children: ReactNode };
+type Props = { data: DataStore & OutboxApi; gym: GymStore; children: ReactNode };
 
-/** Syncs the phone's outbox with the server while there is a session. The website keeps no outbox. */
-export const SyncRuntime = Platform.OS === 'web' ? ({ children }: Props) => <>{children}</> : NativeSyncRuntime;
-
-function NativeSyncRuntime({ outbox, gym, children }: Props) {
+/** Syncs the phone's outbox with the server while there is a session. The website's version is the .web file. */
+export function SyncRuntime({ data: outbox, gym, children }: Props) {
   const { hasStoredSession } = useAuth();
   const [engine] = useState(
     () =>
