@@ -13,9 +13,10 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
+from .auth import require_auth  # noqa: E402
 from .config import settings  # noqa: E402
 from .errors import register_exception_handlers  # noqa: E402
-from .routes import health  # noqa: E402
+from .routes import health, sync  # noqa: E402
 
 app = FastAPI(title="Gym Tracker API")
 
@@ -32,3 +33,4 @@ register_exception_handlers(app)
 # Health is unauthenticated so uptime checks and deploy tooling don't need a
 # token; every other router is mounted with dependencies=[require_auth].
 app.include_router(health.router, prefix="/api/health")
+app.include_router(sync.router, prefix="/api/sync", dependencies=[require_auth])
