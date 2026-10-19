@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { getDay } from '../../engine/dayView';
-import { EngineError, type Change } from '../../engine/types';
+import { persistedSets } from '../../engine/sets';
+import { EngineError, type Change, type SetRow } from '../../engine/types';
+import type { PullPage, SyncApi } from '../../sync/api';
+import { createCursorStore } from '../../sync/cursor';
+import { pullAll } from '../../sync/pull';
 import { StoreCorruptError } from '../DataStore';
 import { createActions, GymStore } from '../GymStore';
 import { LocalStore } from '../LocalStore';
@@ -18,6 +22,28 @@ const day = (id: string, title = 'Chest'): Change => ({
   table: 'days',
   row: { id, date: TODAY, updatedAt: '2026-10-19T10:00:00.000Z', deletedAt: null, status: null, shiftId: null, routineId: null, title, hasLog: true },
 });
+
+const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 19, h, m)).toISOString();
+
+const set = (updatedAt: string, reps: number): Change => ({
+  table: 'sets',
+  row: { id: 's1', updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60 },
+});
+
+/** A SyncApi whose pull is answered by hand; `asked` resolves once the request is out. */
+function latePull() {
+  let answer!: (page: PullPage) => void;
+  let requested!: () => void;
+  const asked = new Promise<void>((resolve) => (requested = resolve));
+  const api: SyncApi = {
+    push: () => Promise.reject(new Error('not used')),
+    pull: () => {
+      requested();
+      return new Promise<PullPage>((resolve) => (answer = resolve));
+    },
+  };
+  return { api, asked, answer: (page: PullPage) => answer(page) };
+}
 
 async function opened(storage = new MemoryStorage()) {
   const local = new LocalStore(storage, deps('ob'));
@@ -139,5 +165,162 @@ describe('GymStore', () => {
     actions.skipToday();
     expect(calls).toBe(2);
     expect([...gym.getState().days.values()][0]).toMatchObject({ date: TODAY, status: 'skipped', title: 'Chest' });
+  });
+
+  test('applyRemote_merges_notifies_and_persists_after_pending_commits', async () => {
+    const { storage, local, gym } = await opened();
+    const order: string[] = [];
+    const commit = local.commit.bind(local);
+    const applyRemote = local.applyRemote.bind(local);
+    vi.spyOn(local, 'commit').mockImplementation(async (c) => {
+      order.push('commit');
+      await commit(c);
+      order.push('commit saved');
+    });
+    vi.spyOn(local, 'applyRemote').mockImplementation(async (c) => {
+      order.push('remote');
+      await applyRemote(c);
+      order.push('remote saved');
+    });
+    const seen: string[][] = [];
+    gym.subscribe(() => seen.push([...gym.getState().days.keys()]));
+
+    gym.dispatch([day('a1')]);
+    const saving = gym.applyRemote([day('r1', 'Back')]);
+    expect(seen).toEqual([['a1'], ['a1', 'r1']]);
+    await saving;
+
+    expect(order).toEqual(['commit', 'commit saved', 'remote', 'remote saved']);
+    const reloaded = new LocalStore(storage, deps('ob'));
+    expect([...(await reloaded.load()).days.keys()].sort()).toEqual(['a1', 'r1']);
+    expect((await reloaded.peek(10)).map((e) => e.rowId)).toEqual(['a1']);
+  });
+
+  test('remote_older_than_a_local_edit_is_ignored', async () => {
+    const { storage, local, gym } = await opened();
+    const remote = vi.spyOn(local, 'applyRemote');
+    gym.dispatch([set(at(12, 2), 10)]);
+    const mine = gym.getState().sets.get('s1');
+    let calls = 0;
+    gym.subscribe(() => calls++);
+
+    const older = set(at(12, 1), 99);
+    await gym.applyRemote([older]);
+    await gym.whenIdle();
+
+    expect(gym.getState().sets.get('s1')).toBe(mine);
+    expect(calls).toBe(0);
+    expect(remote.mock.calls.flatMap(([changes]) => changes)).not.toContainEqual(older);
+    expect((await new LocalStore(storage, deps('ob')).load()).sets.get('s1')?.reps).toBe(10);
+  });
+
+  test('pull_in_flight_during_a_local_edit_does_not_clobber_it', async () => {
+    const { storage, gym } = await opened();
+    const { api, asked, answer } = latePull();
+    const pulling = pullAll({ api, cursor: createCursorStore(storage), apply: (c) => gym.applyRemote(c) });
+    await asked;
+
+    gym.dispatch([set(at(12, 2), 10)]);
+    answer({ changes: [set(at(12, 1), 99)], cursor: 1, hasMore: false, serverTime: at(12) });
+    await pulling;
+    await gym.whenIdle();
+
+    expect(gym.getState().sets.get('s1')?.reps).toBe(10);
+    const reloaded = new LocalStore(storage, deps('ob'));
+    expect((await reloaded.load()).sets.get('s1')?.reps).toBe(10);
+    expect((await reloaded.peek(10)).map((e) => [e.rowId, (e.change.row as SetRow).reps])).toEqual([['s1', 10]]);
+    expect(await createCursorStore(storage).get()).toBe(1);
+  });
+
+  test('remote_tombstone_removes_the_row_from_the_view', async () => {
+    const { gym } = await opened();
+    const actions = createActions(gym, () => TODAY);
+    actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: true });
+    const [mine] = persistedSets(gym.getState(), TODAY, 0);
+    expect(getDay(gym.getState(), gym.ctx(TODAY), TODAY).totals.volumeKg).toBe(600);
+
+    await gym.applyRemote([{ table: 'sets', row: { ...mine, updatedAt: at(13), deletedAt: at(13) } }]);
+
+    expect(persistedSets(gym.getState(), TODAY, 0)).toEqual([]);
+    expect(getDay(gym.getState(), gym.ctx(TODAY), TODAY).totals.volumeKg).toBe(0);
+  });
+
+  test('dispatch_returns_false_and_changes_nothing_while_paused', async () => {
+    const { local, gym } = await opened();
+    const before = gym.getState();
+    let calls = 0;
+    gym.subscribe(() => calls++);
+
+    gym.setWritesPaused(true);
+    expect(gym.dispatch([day('a1')])).toBe(false);
+    await gym.whenIdle();
+
+    expect(gym.getState()).toBe(before);
+    expect(calls).toBe(0);
+    expect(await local.count()).toBe(0);
+
+    gym.setWritesPaused(false);
+    expect(gym.dispatch([day('a1')])).toBe(true);
+    expect(gym.getState().days.has('a1')).toBe(true);
+  });
+
+  test('applyRemote_still_works_while_paused', async () => {
+    const { storage, gym } = await opened();
+    gym.setWritesPaused(true);
+
+    await gym.applyRemote([day('r1')]);
+
+    expect(gym.getState().days.has('r1')).toBe(true);
+    expect((await new LocalStore(storage, deps('ob')).load()).days.has('r1')).toBe(true);
+  });
+
+  test('remote_rows_a_failed_write_dropped_are_saved_by_the_next_pull', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storage.failNextWrite();
+
+    await expect(gym.applyRemote([day('r1')])).rejects.toThrow();
+    expect(gym.getState().days.has('r1')).toBe(true);
+    expect(gym.lastError).toBeInstanceOf(Error);
+
+    // The failed pull kept its cursor, so the next one brings the same row: in memory already, not yet on disk.
+    await gym.applyRemote([day('r1')]);
+
+    expect((await new LocalStore(storage, deps('ob')).load()).days.has('r1')).toBe(true);
+    expect(gym.lastError).toBeNull();
+  });
+
+  test('retry_also_saves_remote_rows_a_failed_write_dropped', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storage.failNextWrite();
+    await gym.applyRemote([day('r1')]).catch(() => {});
+
+    gym.retry();
+    await gym.whenIdle();
+
+    const reloaded = new LocalStore(storage, deps('ob'));
+    expect((await reloaded.load()).days.has('r1')).toBe(true);
+    expect(await reloaded.count()).toBe(0);
+    expect(gym.lastError).toBeNull();
+  });
+
+  test('unsaved_change_replaced_by_a_newer_remote_row_is_not_written_back', async () => {
+    const { storage, gym } = await opened();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    storage.failNextWrite();
+    gym.dispatch([set(at(12, 1), 10)]);
+    await gym.whenIdle();
+
+    await gym.applyRemote([set(at(12, 5), 12)]);
+    gym.retry();
+    await gym.whenIdle();
+
+    expect(gym.getState().sets.get('s1')?.reps).toBe(12);
+    const reloaded = new LocalStore(storage, deps('ob'));
+    expect((await reloaded.load()).sets.get('s1')?.reps).toBe(12);
+    expect(await reloaded.count()).toBe(0);
+    expect(gym.lastError).toBeNull();
   });
 });

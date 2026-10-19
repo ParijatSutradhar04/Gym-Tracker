@@ -10,7 +10,7 @@ import {
 } from '../engine/scheduleEdits';
 import { syncSets } from '../engine/sets';
 import { restoreShift, shiftToday, skipToday } from '../engine/shift';
-import { applyChanges, emptyState } from '../engine/state';
+import { applyChanges, emptyState, mergeRemote } from '../engine/state';
 import type { Change, Ctx, DataState } from '../engine/types';
 import type { DataStore } from './DataStore';
 
@@ -18,6 +18,9 @@ import type { DataStore } from './DataStore';
  * The app's single source of state. Dispatch is optimistic: memory and subscribers update at once,
  * and writes go to the DataStore one at a time, in dispatch order. Changes a write failed to save
  * ride along with the next write (or `retry`); `lastError` stays set until they are saved.
+ *
+ * Rows pulled from the server come in through `applyRemote`, on the same queue but without outbox
+ * entries. While writes are paused (the website offline) dispatch refuses edits; pulls still apply.
  */
 export class GymStore {
   lastError: Error | null = null;
@@ -25,6 +28,8 @@ export class GymStore {
   private listeners = new Set<() => void>();
   private chain: Promise<void> = Promise.resolve();
   private unsaved: Change[] = [];
+  private unsavedRemote: Change[] = [];
+  private writesPaused = false;
 
   constructor(
     private readonly store: DataStore,
@@ -49,16 +54,40 @@ export class GymStore {
     return { today, now: this.deps.now, newId: this.deps.newId };
   }
 
-  dispatch(changes: Change[]): void {
-    if (changes.length === 0) return;
+  /** False, with nothing changed, while writes are paused. */
+  dispatch(changes: Change[]): boolean {
+    if (this.writesPaused) return false;
+    if (changes.length === 0) return true;
     this.state = applyChanges(this.state, changes);
     this.notify();
     this.save(changes);
+    return true;
+  }
+
+  setWritesPaused(paused: boolean): void {
+    this.writesPaused = paused;
+  }
+
+  /**
+   * Merges server rows last-write-wins against memory, so a pull that raced a local edit can't undo it.
+   * Accepted rows show at once and are saved after every write queued before them. Rejects when saving
+   * failed, so the caller keeps its cursor; the rows are kept and saved by the next applyRemote or retry.
+   */
+  applyRemote(changes: Change[]): Promise<void> {
+    const { state, accepted } = mergeRemote(this.state, changes);
+    if (accepted.length > 0) {
+      this.state = state;
+      this.notify();
+    }
+    const saved = this.chain.then(() => this.saveRemote(accepted));
+    this.chain = saved.catch(() => {});
+    return saved;
   }
 
   /** Tries again to save the changes earlier writes failed to save. */
   retry(): void {
     this.save([]);
+    this.chain = this.chain.then(() => this.saveRemote([])).catch(() => {});
   }
 
   /** Resolves once every write dispatched so far has settled. */
@@ -68,22 +97,55 @@ export class GymStore {
 
   private save(changes: readonly Change[]): void {
     this.chain = this.chain.then(async () => {
-      const batch = [...this.unsaved, ...changes];
-      if (batch.length === 0) return;
+      // A failed change that memory has since replaced with a newer row (a later edit, or a server row)
+      // is dropped: writing it now would put the older version back on disk.
+      const batch = [...this.unsaved.filter((c) => !this.replaced(c)), ...changes];
+      if (batch.length === 0) {
+        this.unsaved = [];
+        this.settled();
+        return;
+      }
       try {
         await this.store.commit(batch);
         this.unsaved = [];
-        if (this.lastError) {
-          this.lastError = null;
-          this.notify();
-        }
+        this.settled();
       } catch (err: unknown) {
         this.unsaved = batch;
-        this.lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn('GymStore: saving changes failed', err);
-        this.notify();
+        this.failed(err);
       }
     });
+  }
+
+  private async saveRemote(accepted: readonly Change[]): Promise<void> {
+    const batch = [...this.unsavedRemote, ...accepted];
+    if (batch.length === 0) return;
+    try {
+      await this.store.applyRemote(batch);
+      this.unsavedRemote = [];
+      this.settled();
+    } catch (err: unknown) {
+      this.unsavedRemote = batch;
+      this.failed(err);
+      throw err;
+    }
+  }
+
+  private replaced(c: Change): boolean {
+    const current = (this.state[c.table] as Map<string, { updatedAt: string }>).get(c.row.id);
+    return current !== undefined && current.updatedAt > c.row.updatedAt;
+  }
+
+  private settled(): void {
+    if (this.lastError && this.unsaved.length === 0 && this.unsavedRemote.length === 0) {
+      this.lastError = null;
+      this.notify();
+    }
+  }
+
+  private failed(err: unknown): void {
+    this.lastError = err instanceof Error ? err : new Error(String(err));
+    console.warn('GymStore: saving changes failed', err);
+    this.notify();
   }
 
   private notify(): void {
