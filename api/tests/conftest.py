@@ -1,10 +1,16 @@
-"""Shared fixtures: a freshly migrated test database and an in-process API client."""
+"""Shared fixtures: a freshly migrated test database, an in-process API client and signed tokens."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
 import os
+import time
 from pathlib import Path
+from types import SimpleNamespace
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgres://postgres:postgres@localhost:5433/gymdb_test"
@@ -15,8 +21,12 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 import asyncpg  # noqa: E402
 import httpx  # noqa: E402
+import jwt  # noqa: E402
 import pytest  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 
+from app import auth  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.db import close_pool  # noqa: E402
 from app.main import app  # noqa: E402
 from scripts.migrate import migrate  # noqa: E402
@@ -33,6 +43,8 @@ SYNCED_TABLES = (
     "day_exercises",
     "sets",
 )
+USER_A = "00000000-0000-4000-8000-00000000000a"
+USER_B = "00000000-0000-4000-8000-00000000000b"
 
 
 async def _recreate_test_database() -> None:
@@ -69,3 +81,62 @@ async def client():
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
     await close_pool()
+
+
+@pytest.fixture
+def user_a() -> str:
+    return USER_A
+
+
+@pytest.fixture
+def user_b() -> str:
+    return USER_B
+
+
+def bearer(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def jwks(monkeypatch):
+    """Stands in for the Supabase project's JWKS: one ES256 key pair per test, no network."""
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key()
+    client = SimpleNamespace(get_signing_key_from_jwt=lambda _token: SimpleNamespace(key=public_key))
+    monkeypatch.setattr(auth, "_get_jwk_client", lambda: client)
+    monkeypatch.setattr(settings, "supabase_url", "https://project.supabase.test")
+    return SimpleNamespace(private_key=private_key, public_key=public_key)
+
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+@pytest.fixture
+def make_token(jwks):
+    """Signs a Supabase-shaped session token. sub=None leaves the claim out.
+
+    alg="HS256" signs by hand with `key` as the HMAC secret (PyJWT refuses a
+    PEM key there), so tests can forge an algorithm-confusion token.
+    """
+
+    def _make(
+        sub: str | None = None,
+        *,
+        exp_in: int = 3600,
+        aud: str = "authenticated",
+        key=None,
+        alg: str = "ES256",
+    ) -> str:
+        now = int(time.time())
+        payload = {"aud": aud, "role": "authenticated", "iat": now, "exp": now + exp_in}
+        if sub is not None:
+            payload["sub"] = sub
+        if alg == "HS256":
+            header = {"alg": alg, "typ": "JWT"}
+            signing_input = f"{_b64url(json.dumps(header).encode())}.{_b64url(json.dumps(payload).encode())}"
+            signature = hmac.new(key, signing_input.encode(), hashlib.sha256).digest()
+            return f"{signing_input}.{_b64url(signature)}"
+        return jwt.encode(payload, key or jwks.private_key, algorithm=alg)
+
+    return _make
