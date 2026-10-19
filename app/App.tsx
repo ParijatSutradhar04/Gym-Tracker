@@ -3,6 +3,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, useFonts } from '
 import { RobotoMono_400Regular, RobotoMono_500Medium } from '@expo-google-fonts/roboto-mono';
 import { StatusBar } from 'expo-status-bar';
 import { Text, View } from 'react-native';
+import { GymProvider } from './src/data/GymProvider';
 
 export default function App() {
   const [loaded] = useFonts({
@@ -14,9 +15,13 @@ export default function App() {
   });
   if (!loaded) return null;
   return (
-    <View className="flex-1 bg-bg items-center justify-center">
-      <Text className="font-sans-semibold text-ink">Gym Tracker</Text>
+    <>
+      <GymProvider>
+        <View className="flex-1 bg-bg items-center justify-center">
+          <Text className="font-sans-semibold text-ink">Gym Tracker</Text>
+        </View>
+      </GymProvider>
       <StatusBar style="light" />
-    </View>
+    </>
   );
 }
