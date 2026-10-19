@@ -10,3 +10,6 @@ export const colors = {
   onAccent: '#17200D',
   scrim: 'rgba(0,0,0,0.72)',
 } as const;
+
+/** Selected-row tint: accent at low alpha over surface-2. */
+export const accentTint = 'rgba(197,247,107,0.14)';
