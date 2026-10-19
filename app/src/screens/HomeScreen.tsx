@@ -8,12 +8,14 @@ import { GymMissedDialog } from '../components/GymMissedDialog';
 import { GymMissedFab } from '../components/GymMissedFab';
 import { TopBar } from '../components/TopBar';
 import { UndoBar } from '../components/UndoBar';
-import { useActions, useCtx, useGymState, useGymStore, useToday } from '../data/hooks';
+import { useActions, useCtx, useGymState, useGymStore, useLayout, useToday } from '../data/hooks';
 import { getDay } from '../engine/dayView';
 import { restorableShift } from '../engine/shift';
 import { EngineError } from '../engine/types';
+import { DesktopHome } from './DesktopHome';
 
 export function HomeScreen() {
+  const { isDesktop } = useLayout();
   const today = useToday();
   const state = useGymState();
   const store = useGymStore();
@@ -50,6 +52,32 @@ export function HomeScreen() {
     setUndo(null);
   };
 
+  const dialogs = (
+    <>
+      <GymMissedDialog visible={missedOpen} onClose={() => setMissedOpen(false)} day={day} onDone={onMissedDone} />
+      <ExportSheet visible={exportOpen} onClose={() => setExportOpen(false)} />
+    </>
+  );
+
+  if (isDesktop) {
+    return (
+      <View className="flex-1 bg-bg">
+        <DesktopHome
+          selected={selected}
+          onSelect={setSelected}
+          onExport={() => setExportOpen(true)}
+          onGymMissed={() => setMissedOpen(true)}
+        />
+        <View pointerEvents="box-none" className="absolute inset-0 items-center">
+          <View pointerEvents="box-none" className="w-full max-w-[560px] h-full">
+            {showUndo ? <UndoBar message={undo.message} onUndo={onUndo} onExpire={dismissUndo} /> : null}
+          </View>
+        </View>
+        {dialogs}
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <TopBar onExport={() => setExportOpen(true)} />
@@ -61,8 +89,7 @@ export function HomeScreen() {
         <GymMissedFab visible={day.canGymMissed} onPress={() => setMissedOpen(true)} />
         {showUndo ? <UndoBar message={undo.message} onUndo={onUndo} onExpire={dismissUndo} /> : null}
       </View>
-      <GymMissedDialog visible={missedOpen} onClose={() => setMissedOpen(false)} day={day} onDone={onMissedDone} />
-      <ExportSheet visible={exportOpen} onClose={() => setExportOpen(false)} />
+      {dialogs}
     </SafeAreaView>
   );
 }

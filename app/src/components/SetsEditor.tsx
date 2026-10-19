@@ -13,6 +13,8 @@ interface Props {
   showDone: boolean;
   readOnly: boolean;
   onDone?: () => void;
+  /** Omit the title block; the desktop panel renders its own heading. */
+  bare?: boolean;
 }
 
 interface Row {
@@ -32,7 +34,7 @@ const toRow = (draft: SetDraft): Row => ({
 });
 
 /** Shared body of the mobile sheet and the desktop panel. Key it by date + position. */
-export function SetsEditor({ date, position, showDone, readOnly, onDone }: Props) {
+export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }: Props) {
   const state = useGymState();
   const ctx = useCtx();
   const actions = useActions();
@@ -72,11 +74,15 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone }: Props
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 640 }}>
-      <View className="pr-12">
-        <Text className="font-sans-semibold text-accent text-[10px] tracking-wider uppercase">{info.routineTitle}</Text>
-        <Text className="font-sans-medium text-ink text-[28px] mt-1">{info.exerciseName}</Text>
-      </View>
-      <Text className="font-sans text-muted text-[12px] mt-3 mb-5">Dial in your reps. Build on your last set.</Text>
+      {bare ? null : (
+        <>
+        <View className="pr-12">
+          <Text className="font-sans-semibold text-accent text-[10px] tracking-wider uppercase">{info.routineTitle}</Text>
+          <Text className="font-sans-medium text-ink text-[28px] mt-1">{info.exerciseName}</Text>
+        </View>
+        <Text className="font-sans text-muted text-[12px] mt-3 mb-5">Dial in your reps. Build on your last set.</Text>
+        </>
+      )}
       <View className="gap-3">
         {rows.map((r, i) => (
           <View key={i}>

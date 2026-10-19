@@ -6,7 +6,7 @@ import { earliestDataDate } from '../engine/dayView';
 
 const ITEM_W = 58;
 const GAP = 8;
-const PAD = 20;
+const DEFAULT_INSET = 20;
 const STRIDE = ITEM_W + GAP;
 const FUTURE_DAYS = 84;
 
@@ -18,9 +18,11 @@ function monthLabel(date: DateStr): string {
 interface Props {
   selected: DateStr;
   onSelect: (date: DateStr) => void;
+  /** Horizontal padding of the label row and the strip; the desktop column supplies its own margins. */
+  inset?: number;
 }
 
-export function DateBar({ selected, onSelect }: Props) {
+export function DateBar({ selected, onSelect, inset = DEFAULT_INSET }: Props) {
   const state = useGymState();
   const ctx = useCtx();
   const today = useToday();
@@ -43,13 +45,13 @@ export function DateBar({ selected, onSelect }: Props) {
   });
 
   const getItemLayout = useCallback(
-    (_: ArrayLike<DateStr> | null | undefined, index: number) => ({ length: STRIDE, offset: PAD + index * STRIDE, index }),
-    [],
+    (_: ArrayLike<DateStr> | null | undefined, index: number) => ({ length: STRIDE, offset: inset + index * STRIDE, index }),
+    [inset],
   );
 
   return (
     <View className="pt-3 pb-[18px] gap-3">
-      <View className="px-5 flex-row items-center justify-between">
+      <View style={{ paddingHorizontal: inset }} className="flex-row items-center justify-between">
         <Text className="font-sans-medium text-muted text-[12px] tracking-wider">{label}</Text>
         <Text className="font-sans text-faint text-[11px]">← Past days</Text>
       </View>
@@ -65,7 +67,7 @@ export function DateBar({ selected, onSelect }: Props) {
         onScrollToIndexFailed={() => {}}
         onViewableItemsChanged={onViewable.current}
         viewabilityConfig={{ itemVisiblePercentThreshold: 100 }}
-        contentContainerStyle={{ paddingHorizontal: PAD }}
+        contentContainerStyle={{ paddingHorizontal: inset }}
         ItemSeparatorComponent={() => <View style={{ width: GAP }} />}
         renderItem={({ item }) => {
           const on = item === selected;
