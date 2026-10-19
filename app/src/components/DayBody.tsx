@@ -4,6 +4,7 @@ import { useCtx, useGymState } from '../data/hooks';
 import type { DateStr } from '../engine/dates';
 import { getDay } from '../engine/dayView';
 import { colors } from '../theme';
+import { ExerciseList } from './ExerciseList';
 import { Icon } from './icons';
 import { ScheduleBanner } from './ScheduleBanner';
 import { ScheduleSheet } from './ScheduleSheet';
@@ -31,6 +32,7 @@ export function DayBody({ date }: { date: DateStr }) {
           </Text>
         </View>
       ) : null}
+      <ExerciseList day={day} onSelect={() => {}} />
       <ScheduleSheet
         mode={scheduleMode ?? 'add'}
         date={date}
