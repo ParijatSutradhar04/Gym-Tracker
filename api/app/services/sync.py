@@ -1,13 +1,15 @@
-"""Push: apply a batch of client rows for one user with last-write-wins per row."""
+"""Push applies a batch of client rows with last-write-wins per row; pull pages rows by server cursor."""
 
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
-from ..rows import TABLES, RowInvalid, TableSpec, validate_row
+from ..rows import TABLES, RowInvalid, TableSpec, format_timestamp, to_wire, validate_row
 
 MAX_PUSH_ENTRIES = 200
+DEFAULT_PULL_LIMIT = 500
+MAX_PULL_LIMIT = 1000
 
 
 def _upsert_sql(table: str, spec: TableSpec) -> str:
@@ -67,3 +69,32 @@ async def push(conn, user_id: str, entries: list[dict]) -> dict:
                 await conn.execute(UPSERT_SQL[table], user_id, json.dumps(by_table[table], default=_jsonable))
 
     return {"acked": acked, "rejected": rejected}
+
+
+# Each branch reads one table through its (user_id, seq) index and is capped
+# on its own, so the outer sort sees at most 7 * (limit + 1) rows.
+PULL_SQL = (
+    "SELECT tbl, seq, data FROM ("
+    + " UNION ALL ".join(
+        f"(SELECT '{table}' AS tbl, seq, to_jsonb(t) AS data FROM {table} t"
+        f" WHERE user_id = $1 AND seq > $2 ORDER BY seq LIMIT $3)"
+        for table in TABLES
+    )
+    + ") changed ORDER BY seq LIMIT $3"
+)
+
+
+def server_time() -> str:
+    return format_timestamp(datetime.now(timezone.utc))
+
+
+async def pull(conn, user_id: str, cursor: int, limit: int) -> dict:
+    """The user's rows with seq > cursor, oldest first, at most `limit` of them."""
+    records = await conn.fetch(PULL_SQL, user_id, cursor, limit + 1)
+    page = records[:limit]
+    return {
+        "changes": [{"table": r["tbl"], "row": to_wire(r["tbl"], json.loads(r["data"]))} for r in page],
+        "cursor": page[-1]["seq"] if page else cursor,
+        "hasMore": len(records) > limit,
+        "serverTime": server_time(),
+    }

@@ -228,10 +228,12 @@ def format_timestamp(value: datetime) -> str:
 def _wire_value(sql_type: str, value: Any) -> Any:
     if value is None:
         return None
+    # Values come either from asyncpg (datetime, date, UUID, Decimal, jsonb
+    # text) or from a to_jsonb() row (strings and JSON numbers).
     if sql_type == "timestamptz":
-        return format_timestamp(value)
+        return format_timestamp(value if isinstance(value, datetime) else datetime.fromisoformat(value))
     if sql_type == "date":
-        return value.isoformat()
+        return value if isinstance(value, str) else value.isoformat()
     if sql_type == "uuid":
         return str(value)
     if sql_type == "jsonb":

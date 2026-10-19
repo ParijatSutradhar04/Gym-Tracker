@@ -140,3 +140,47 @@ def make_token(jwks):
         return jwt.encode(payload, key or jwks.private_key, algorithm=alg)
 
     return _make
+
+
+@pytest.fixture
+def push(client, db, make_token, user_a):
+    """POSTs entries to /api/sync/push as user_a (or the given token's user), on emptied tables."""
+
+    async def _push(entries, token=None):
+        # ASCII-escaped like JSON.stringify, so a lone surrogate travels as "\ud800".
+        return await client.post(
+            "/api/sync/push",
+            content=json.dumps({"entries": entries}),
+            headers={**bearer(token or make_token(user_a)), "Content-Type": "application/json"},
+        )
+
+    return _push
+
+
+@pytest.fixture
+def pull(client, db, make_token, user_a):
+    """GETs /api/sync/pull as user_a (or the given token's user); None leaves a parameter out."""
+
+    async def _pull(cursor=None, limit=None, token=None):
+        params = {k: v for k, v in {"cursor": cursor, "limit": limit}.items() if v is not None}
+        return await client.get("/api/sync/pull", params=params, headers=bearer(token or make_token(user_a)))
+
+    return _pull
+
+
+class CountingConnection:
+    """Proxies a connection and counts every statement sent through it."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self.statements = 0
+
+    def __getattr__(self, name):
+        attr = getattr(self._conn, name)
+        if name in ("execute", "executemany", "fetch", "fetchrow", "fetchval"):
+            async def counted(*args, **kwargs):
+                self.statements += 1
+                return await attr(*args, **kwargs)
+
+            return counted
+        return attr

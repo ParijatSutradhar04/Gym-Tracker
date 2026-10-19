@@ -1,4 +1,3 @@
-import json
 import re
 from decimal import Decimal
 
@@ -6,26 +5,13 @@ import pytest
 
 from app.rows import to_wire
 from app.services import sync
-from tests.conftest import SYNCED_TABLES, bearer
+from tests.conftest import SYNCED_TABLES, CountingConnection, bearer
 from tests.samples import entry, sample_row
 
 T1 = "2026-10-19T12:00:00.000Z"
 T2 = "2026-10-19T12:00:01.000Z"
 EARLIER = "2026-10-19T11:59:00.000Z"
 ISO_MS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
-
-
-@pytest.fixture
-def push(client, make_token, user_a):
-    async def _push(entries, token=None):
-        # ASCII-escaped like JSON.stringify, so a lone surrogate travels as "\ud800".
-        return await client.post(
-            "/api/sync/push",
-            content=json.dumps({"entries": entries}),
-            headers={**bearer(token or make_token(user_a)), "Content-Type": "application/json"},
-        )
-
-    return _push
 
 
 async def fetch_one(db, table, row_id):
@@ -241,24 +227,6 @@ async def test_database_error_rolls_back_the_whole_batch(push, db, monkeypatch):
     r = await push([entry("routines"), entry("sets")])
     assert r.status_code == 500
     assert await db.fetchval("SELECT count(*) FROM routines") == 0
-
-
-class CountingConnection:
-    """Proxies a connection and counts every statement sent through it."""
-
-    def __init__(self, conn):
-        self._conn = conn
-        self.statements = 0
-
-    def __getattr__(self, name):
-        attr = getattr(self._conn, name)
-        if name in ("execute", "executemany", "fetch", "fetchrow", "fetchval"):
-            async def counted(*args, **kwargs):
-                self.statements += 1
-                return await attr(*args, **kwargs)
-
-            return counted
-        return attr
 
 
 async def test_push_round_trips_are_bounded(db, user_a):
