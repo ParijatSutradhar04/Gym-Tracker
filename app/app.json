@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Gym Tracker",
+    "slug": "gym-tracker",
+    "scheme": "gym-tracker",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.parijat.gymtracker",
+      "adaptiveIcon": {
+        "backgroundColor": "#101211",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "owner": "parijatsutradhars-team"
+  }
+}

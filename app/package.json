@@ -1,0 +1,40 @@
+{
+  "name": "gym-tracker-app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/roboto-mono": "^0.4.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.14",
+    "expo-crypto": "~57.0.4",
+    "expo-file-system": "~57.0.7",
+    "expo-font": "~57.0.1",
+    "expo-sharing": "~57.0.23",
+    "expo-status-bar": "~57.0.1",
+    "lucide-react-native": "^1.58.0",
+    "nativewind": "^4.2.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "babel-preset-expo": "^57.0.7",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "web": "expo start --web",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
+}
