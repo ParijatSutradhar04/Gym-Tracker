@@ -9,11 +9,21 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://gymtracker-kappa-gules.vercel.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://stewfemwzhwhhhyohxoy.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZXdmZW13emh3aGhoeW9oeG95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0OTMyNTIsImV4cCI6MjEwODA2OTI1Mn0.Isjm7if5s5SkNu2D2Dvo8FJx8VE4Bune_0nSJDc6sNk"
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://gymtracker-kappa-gules.vercel.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://stewfemwzhwhhhyohxoy.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZXdmZW13emh3aGhoeW9oeG95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0OTMyNTIsImV4cCI6MjEwODA2OTI1Mn0.Isjm7if5s5SkNu2D2Dvo8FJx8VE4Bune_0nSJDc6sNk"
+      }
     }
   }
 }
