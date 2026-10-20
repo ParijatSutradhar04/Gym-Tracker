@@ -113,3 +113,26 @@ CREATE TABLE IF NOT EXISTS sets (
   PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_sets_pull ON sets (user_id, seq);
+
+-- Supabase also serves every table in `public` through its Data API to anyone holding the anon key, which
+-- ships in the app. Only the API may touch these rows: it connects as the tables' owner, which RLS does not
+-- apply to, so RLS with no policies refuses the anon and authenticated roles everything. The revokes take back
+-- Supabase's default grants as well; they are skipped where those roles don't exist (local Postgres).
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routine_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE occurrence_moves ENABLE ROW LEVEL SECURITY;
+ALTER TABLE days ENABLE ROW LEVEL SECURITY;
+ALTER TABLE day_exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sets ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('anon', 'authenticated')) = 2 THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+  END IF;
+END $$;

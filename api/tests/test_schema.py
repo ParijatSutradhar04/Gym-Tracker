@@ -80,3 +80,34 @@ async def test_migrate_applies_new_migrations_once(db, tmp_path):
         await db.execute("DROP TABLE IF EXISTS migrate_probe")
         await db.execute("DELETE FROM schema_migrations WHERE name = '001_x.sql'")
     assert MIGRATIONS_DIR.is_dir()
+
+
+PUBLIC_TABLES = """
+    SELECT c.oid, c.relname, c.relkind::text AS relkind, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind IN ('r', 'S')
+"""
+
+
+async def test_row_level_security_is_on_for_every_table(db):
+    # Supabase serves every table in `public` through its Data API to anyone holding the anon key, which ships
+    # in the app. With RLS on and no policies, only the tables' owner (the API's connection) can reach rows.
+    tables = [r for r in await db.fetch(PUBLIC_TABLES) if r["relkind"] == "r"]
+    assert {*SYNCED_TABLES, "schema_migrations"} <= {r["relname"] for r in tables}
+    assert [r["relname"] for r in tables if not r["relrowsecurity"]] == []
+
+
+async def test_supabase_client_roles_get_no_access_after_init(db):
+    # Supabase grants anon and authenticated everything in `public` by default; mimic that, then re-run init.sql.
+    for role in ("anon", "authenticated"):
+        if not await db.fetchval("SELECT 1 FROM pg_roles WHERE rolname = $1", role):
+            await db.execute(f"CREATE ROLE {role} NOLOGIN")
+    await db.execute("GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated")
+    await db.execute("GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated")
+    await db.execute(INIT_SQL.read_text(encoding="utf8"))
+    leaks = []
+    for role in ("anon", "authenticated"):
+        for r in await db.fetch(PUBLIC_TABLES):
+            privs = ("SELECT", "INSERT", "UPDATE", "DELETE") if r["relkind"] == "r" else ("USAGE", "SELECT", "UPDATE")
+            fn = "has_table_privilege" if r["relkind"] == "r" else "has_sequence_privilege"
+            leaks += [f"{role} {p} {r['relname']}" for p in privs if await db.fetchval(f"SELECT {fn}($1, $2::oid, $3)", role, r["oid"], p)]
+    assert leaks == []
