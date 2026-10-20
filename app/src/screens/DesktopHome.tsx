@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackfillSheet } from '../components/BackfillSheet';
@@ -137,29 +137,25 @@ export function DesktopHome({ selected, onSelect, onExport, onGymMissed }: Props
               {current ? (
                 <View className="rounded-[16px] bg-surface p-6">
                   <Text className="font-sans-semibold text-accent text-[10px] tracking-wider">SET DETAILS</Text>
-                  <PanelTitle
-                    key={`${selected}:${current.position}:${current.name}`}
-                    name={current.name}
-                    onRename={(name) => {
-                      try {
-                        actions.renameExercise({ date: selected, position: current.position, name });
-                      } catch (e) {
-                        if (!(e instanceof EngineError)) throw e;
-                      }
-                    }}
-                  />
-                  <Text className="font-sans text-muted text-[12px] mt-3 mb-5">
-                    Record your reps and weight for each set.
-                  </Text>
-                  {/* Keyed by name too: deleting an exercise shifts the next one into this position. */}
-                  <SetsEditor
-                    key={`${selected}:${current.position}:${current.name}`}
-                    date={selected}
-                    position={current.position}
-                    readOnly={false}
-                    showDone
-                    bare
-                  />
+                  {/* One key for the title and the editor together: siblings sharing a key are never removed, so
+                      each exercise picked left its title behind. Keyed by name too: deleting an exercise shifts
+                      the next one into this position. */}
+                  <Fragment key={`${selected}:${current.position}:${current.name}`}>
+                    <PanelTitle
+                      name={current.name}
+                      onRename={(name) => {
+                        try {
+                          actions.renameExercise({ date: selected, position: current.position, name });
+                        } catch (e) {
+                          if (!(e instanceof EngineError)) throw e;
+                        }
+                      }}
+                    />
+                    <Text className="font-sans text-muted text-[12px] mt-3 mb-5">
+                      Record your reps and weight for each set.
+                    </Text>
+                    <SetsEditor date={selected} position={current.position} readOnly={false} showDone bare />
+                  </Fragment>
                   <View className="flex-row items-center gap-2 mt-5">
                     <Icon name="Check" size={14} color={colors.accent} />
                     <Text className="font-sans text-muted text-[11px]">All changes saved automatically</Text>
