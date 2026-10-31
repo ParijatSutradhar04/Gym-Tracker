@@ -82,7 +82,7 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
 
   const addSet = () => {
     const last = rows[rows.length - 1]?.draft;
-    setRows([...rows, toRow({ reps: last?.reps ?? null, weightKg: last?.weightKg ?? null, touched: false })]);
+    setRows([...rows, toRow({ reps: last?.reps ?? null, weightKg: last?.weightKg ?? null, touched: false, isDrop: false })]);
   };
 
   const done = () => {

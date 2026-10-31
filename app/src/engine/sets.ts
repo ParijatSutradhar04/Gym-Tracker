@@ -11,11 +11,33 @@ export interface SetDraft {
   reps: number | null;
   weightKg: number | null;
   touched: boolean;
+  isDrop: boolean;
 }
 
 const EMPTY_ROWS = 3;
 const MAX_REPS = 999;
 const MAX_KG = 1000;
+
+/**
+ * The label number of each row: drops repeat the number of the set above them. A drop with no set above
+ * it (only possible after a merge) counts as a set.
+ */
+export function numberSets(rows: readonly { isDrop: boolean }[]): { number: number; isDrop: boolean }[] {
+  let n = 0;
+  return rows.map((r, i) => {
+    const isDrop = i > 0 && r.isDrop;
+    if (!isDrop) n++;
+    return { number: n, isDrop };
+  });
+}
+
+/** Exclusive end of the rows × on row i removes: a set takes the drops directly under it, a drop only itself. */
+export function removalEnd(rows: readonly { isDrop: boolean }[], i: number): number {
+  const kinds = numberSets(rows);
+  let end = i + 1;
+  if (!kinds[i].isDrop) while (end < rows.length && kinds[end].isDrop) end++;
+  return end;
+}
 
 /** Live sets of the exercise at `position` on a logged day; [] when the day has no log. */
 export function persistedSets(state: DataState, date: DateStr, position: number): SetRow[] {
@@ -41,13 +63,13 @@ function historyRows(state: DataState, date: DateStr, exerciseName: string): Set
       }
     }
   }
-  return best && best.map((s) => ({ reps: s.reps, weightKg: s.weightKg, touched: false }));
+  return best && best.map((s) => ({ reps: s.reps, weightKg: s.weightKg, touched: false, isDrop: s.isDrop }));
 }
 
 export function prefillRows(state: DataState, date: DateStr, exerciseName: string): SetDraft[] {
   return (
     historyRows(state, date, exerciseName) ??
-    Array.from({ length: EMPTY_ROWS }, () => ({ reps: null, weightKg: null, touched: false }))
+    Array.from({ length: EMPTY_ROWS }, () => ({ reps: null, weightKg: null, touched: false, isDrop: false }))
   );
 }
 
@@ -67,7 +89,7 @@ export function getSetsSheet(state: DataState, ctx: Ctx, date: DateStr, position
   const persisted = persistedSets(state, date, position);
   const readOnly = date > ctx.today;
   if (persisted.length > 0) {
-    const rows = persisted.map((s) => ({ reps: s.reps, weightKg: s.weightKg, touched: true }));
+    const rows = persisted.map((s) => ({ reps: s.reps, weightKg: s.weightKg, touched: true, isDrop: s.isDrop }));
     return { routineTitle, exerciseName: exercise.name, rows, prefilled: false, readOnly };
   }
   const history = historyRows(state, date, exercise.name);
@@ -107,7 +129,10 @@ export function syncSets(
   const pending = rows.flatMap((r, i) => {
     if (!written[i]) return [];
     const prev = byNumber.get(i + 1);
-    return prev && prev.reps === r.reps && prev.weightKg === r.weightKg ? [] : [{ setNumber: i + 1, row: r, prev }];
+    const isDrop = i > 0 && r.isDrop;
+    return prev && prev.reps === r.reps && prev.weightKg === r.weightKg && prev.isDrop === isDrop
+      ? []
+      : [{ setNumber: i + 1, row: { ...r, isDrop }, prev }];
   });
   if (pending.length === 0 && deletes.length === 0) return [];
   const wasLogged = [...byNumber.values()].some(isLogged);
@@ -120,8 +145,8 @@ export function syncSets(
     pending.map(({ setNumber, row, prev }): Change => ({
       table: 'sets',
       row: prev
-        ? { ...prev, reps: row.reps, weightKg: row.weightKg, updatedAt: now }
-        : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg, isDrop: false },
+        ? { ...prev, reps: row.reps, weightKg: row.weightKg, isDrop: row.isDrop, updatedAt: now }
+        : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg, isDrop: row.isDrop },
     })),
   );
   rec.apply(orderChanges(rec.state(), date, now, wasLogged ? undefined : dayExerciseId));

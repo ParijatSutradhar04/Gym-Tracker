@@ -106,7 +106,7 @@ export function logSets(
   ctx: Ctx,
   date: DateStr,
   exerciseName: string,
-  rows: [number | null, number | null][],
+  rows: [number | null, number | null, boolean?][],
 ): DataState {
   const position = dayExercises(state, date).findIndex((x) => normalizeName(x.name) === normalizeName(exerciseName));
   if (position < 0) throw new Error(`No exercise ${exerciseName} on ${date}`);
@@ -115,7 +115,7 @@ export function logSets(
     syncSets(state, ctx, {
       date,
       position,
-      rows: rows.map(([reps, weightKg]) => ({ reps, weightKg, touched: true })),
+      rows: rows.map(([reps, weightKg, isDrop = false]) => ({ reps, weightKg, touched: true, isDrop })),
       includeUntouched: true,
     }),
   );

@@ -84,7 +84,7 @@ describe('performed order', () => {
     const changes = syncSets(s, ctx, {
       date: TODAY,
       position: 1,
-      rows: [{ reps: 10, weightKg: 14, touched: true }],
+      rows: [{ reps: 10, weightKg: 14, touched: true, isDrop: false }],
       includeUntouched: false,
     });
     expect(changes.some((c) => c.table === 'sets')).toBe(true);

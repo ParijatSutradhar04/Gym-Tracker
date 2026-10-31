@@ -82,7 +82,7 @@ describe('GymStore', () => {
     const { storage, gym } = await opened();
     const actions = createActions(gym, () => TODAY);
     actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
-    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: true });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: true });
     await gym.whenIdle();
 
     const local = new LocalStore(storage, deps('ob'));
@@ -101,7 +101,7 @@ describe('GymStore', () => {
     actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
     await gym.whenIdle();
     const queued = (await local.peek(1000)).length;
-    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: false });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: false });
     await gym.whenIdle();
     const added = (await local.peek(1000)).slice(queued).map((e) => e.change);
     expect(added.some((c) => c.table === 'sets')).toBe(true);
@@ -266,7 +266,7 @@ describe('GymStore', () => {
     const { gym } = await opened();
     const actions = createActions(gym, () => TODAY);
     actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
-    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: true });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: true });
     const [mine] = persistedSets(gym.getState(), TODAY, 0);
     expect(getDay(gym.getState(), gym.ctx(TODAY), TODAY).totals.volumeKg).toBe(600);
 

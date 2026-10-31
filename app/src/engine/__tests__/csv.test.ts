@@ -133,7 +133,7 @@ describe('buildCsv', () => {
 
   test('deleted_sets_and_exercises_are_not_exported', () => {
     const { ctx, s } = fixture();
-    const rows = [{ reps: 10, weightKg: 60, touched: true }];
+    const rows = [{ reps: 10, weightKg: 60, touched: true, isDrop: false }];
     let s1 = run(s, syncSets(s, ctx, { date: '2026-09-07', position: 0, rows, includeUntouched: true }));
     s1 = run(s1, deleteExercise(s1, ctx, { date: '2026-09-07', position: 1 }));
     expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY)).slice(1)).toEqual([
