@@ -2,6 +2,7 @@ import type { DateStr } from './dates';
 import { dayExercises, ensureDayLog, loggedExercises } from './dayLog';
 import { stableId } from './ids';
 import { normalizeName } from './names';
+import { isLogged, orderChanges } from './order';
 import { scheduleOn } from './schedule';
 import { createRecorder, getIndex } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type SetRow } from './types';
@@ -109,6 +110,7 @@ export function syncSets(
     return prev && prev.reps === r.reps && prev.weightKg === r.weightKg ? [] : [{ setNumber: i + 1, row: r, prev }];
   });
   if (pending.length === 0 && deletes.length === 0) return [];
+  const wasLogged = [...byNumber.values()].some(isLogged);
 
   const rec = createRecorder(state);
   rec.apply(ensureDayLog(state, ctx, date));
@@ -122,6 +124,7 @@ export function syncSets(
         : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg, isDrop: false },
     })),
   );
+  rec.apply(orderChanges(rec.state(), date, now, wasLogged ? undefined : dayExerciseId));
   return rec.changes();
 }
 

@@ -246,6 +246,7 @@ describe('restore', () => {
     expect(dayRow(s3, MON)).toMatchObject({ status: null, shiftId: null, hasLog: true, title: 'Chest' });
     const bench = getIndex(s3).exercisesByDate.get(MON)![0];
     expect(getIndex(s3).setsByExercise.get(bench.id)?.map((x) => [x.reps, x.weightKg])).toEqual([[8, 70]]);
+    expect(bench.performedOrder).toBe(1);
   });
 
   test('restore_not_offered_the_next_day', () => {

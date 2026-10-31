@@ -1,12 +1,9 @@
 import type { DateStr } from './dates';
 import { formatKg } from './dates';
 import { dayExercises } from './dayLog';
+import { isLogged } from './order';
 import { persistedSets, prefillRows } from './sets';
 import type { DataState, SetRow } from './types';
-
-export function isLogged(set: SetRow): boolean {
-  return set.reps !== null;
-}
 
 const plural = (n: number) => `${n} ${n === 1 ? 'set' : 'sets'}`;
 
