@@ -88,7 +88,7 @@ async def test_wire_shape_is_camelCase_without_user_id_or_seq(push, pull):
     await push([{"id": "e1", "table": "sets", "row": s}, {"id": "e2", "table": "days", "row": d}])
     body = (await pull()).json()
     rows = {c["table"]: c["row"] for c in body["changes"]}
-    assert set(rows["sets"]) == {"id", "updatedAt", "deletedAt", "dayExerciseId", "setNumber", "reps", "weightKg"}
+    assert set(rows["sets"]) == {"id", "updatedAt", "deletedAt", "dayExerciseId", "setNumber", "reps", "weightKg", "isDrop"}
     assert rows["sets"]["updatedAt"] == "2026-10-19T12:00:00.123Z"
     assert rows["sets"] == s
     assert rows["days"]["date"] == "2026-10-19"

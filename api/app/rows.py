@@ -116,6 +116,8 @@ class DayExercise(_Row):
     date: Date
     position: Annotated[int, Field(strict=True, ge=0, le=_INT4_MAX)]
     name: Name
+    # Optional so an app built before these fields still syncs; missing means the default.
+    performed_order: Annotated[int, Field(strict=True, ge=1, le=_INT4_MAX)] | None = None
 
 
 class SetRow(_Row):
@@ -123,6 +125,7 @@ class SetRow(_Row):
     set_number: Annotated[int, Field(strict=True, ge=1, le=_INT4_MAX)]
     reps: Annotated[int, Field(strict=True, ge=0, le=999)] | None
     weight_kg: Annotated[float, BeforeValidator(_number), Field(ge=0, le=1000)] | None
+    is_drop: StrictBool = False
 
 
 @dataclass(frozen=True)
@@ -174,9 +177,16 @@ TABLES: dict[str, TableSpec] = {
     "occurrence_moves": _spec(
         OccurrenceMove, ("routine_id", "uuid"), ("from_date", "date"), ("to_date", "date"), ("shift_id", "uuid")
     ),
-    "day_exercises": _spec(DayExercise, ("date", "date"), ("position", "int"), ("name", "text")),
+    "day_exercises": _spec(
+        DayExercise, ("date", "date"), ("position", "int"), ("name", "text"), ("performed_order", "int")
+    ),
     "sets": _spec(
-        SetRow, ("day_exercise_id", "uuid"), ("set_number", "int"), ("reps", "int"), ("weight_kg", "numeric(7,2)")
+        SetRow,
+        ("day_exercise_id", "uuid"),
+        ("set_number", "int"),
+        ("reps", "int"),
+        ("weight_kg", "numeric(7,2)"),
+        ("is_drop", "boolean"),
     ),
 }
 

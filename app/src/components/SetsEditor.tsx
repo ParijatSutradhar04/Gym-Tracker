@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useActions, useCtx, useGymState } from '../data/hooks';
 import { formatKg, type DateStr } from '../engine/dates';
-import { getSetsSheet, parseRepsInput, parseWeightInput, type SetDraft } from '../engine/sets';
+import { getSetsSheet, numberSets, parseRepsInput, parseWeightInput, removalEnd, type SetDraft } from '../engine/sets';
 import { EngineError } from '../engine/types';
 import { colors } from '../theme';
 import { Button } from './Button';
@@ -80,9 +80,29 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
     commit(rows.map((r, j) => (j === i ? updated : r)));
   };
 
+  const drafts = rows.map((r) => r.draft);
+  const kinds = numberSets(drafts);
+
   const addSet = () => {
-    const last = rows[rows.length - 1]?.draft;
-    setRows([...rows, toRow({ reps: last?.reps ?? null, weightKg: last?.weightKg ?? null, touched: false })]);
+    let last: SetDraft | undefined;
+    for (let j = rows.length - 1; j >= 0; j--) {
+      if (!kinds[j].isDrop) {
+        last = rows[j].draft;
+        break;
+      }
+    }
+    setRows([...rows, toRow({ reps: last?.reps ?? null, weightKg: last?.weightKg ?? null, touched: false, isDrop: false })]);
+  };
+
+  const addDrop = () => {
+    setRows([...rows, toRow({ reps: null, weightKg: null, touched: false, isDrop: true })]);
+  };
+
+  const toggleDrop = (i: number) => {
+    const next = rows.map((r, j) =>
+      j === i ? { ...r, draft: { ...r.draft, isDrop: !kinds[i].isDrop, touched: true } } : r,
+    );
+    commit(next);
   };
 
   const done = () => {
@@ -107,8 +127,25 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
       <View className="gap-[10px]">
         {rows.map((r, i) => (
           <View key={i}>
-            <View className="flex-row items-center gap-2 h-[60px]">
-              <Text className="font-sans-medium text-muted text-[12px] w-12">Set {i + 1}</Text>
+            <View className={`flex-row items-center gap-2 h-[60px] ${kinds[i].isDrop ? 'ml-4' : ''}`}>
+              {locked || i === 0 ? (
+                <Text className="font-sans-medium text-muted text-[12px] w-12">
+                  {kinds[i].isDrop ? '↳ Drop' : `Set ${kinds[i].number}`}
+                </Text>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={kinds[i].isDrop ? `Drop of set ${kinds[i].number}` : `Set ${kinds[i].number}`}
+                  accessibilityHint="Switches between set and drop"
+                  hitSlop={{ top: 12, bottom: 12 }}
+                  onPress={() => toggleDrop(i)}
+                  className="w-12 justify-center"
+                >
+                  <Text className="font-sans-medium text-muted text-[12px]">
+                    {kinds[i].isDrop ? '↳ Drop' : `Set ${kinds[i].number}`}
+                  </Text>
+                </Pressable>
+              )}
               <Field
                 value={r.repsText}
                 suffix="Reps"
@@ -128,8 +165,8 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
               ) : (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Delete set ${i + 1}`}
-                  onPress={() => commit(rows.filter((_, j) => j !== i))}
+                  accessibilityLabel={kinds[i].isDrop ? `Delete drop of set ${kinds[i].number}` : `Delete set ${kinds[i].number}`}
+                  onPress={() => commit(rows.filter((_, j) => j < i || j >= removalEnd(drafts, i)))}
                   className="w-11 h-11 items-center justify-center"
                 >
                   <Icon name="X" size={20} color={colors.ink} />
@@ -148,13 +185,25 @@ export function SetsEditor({ date, position, showDone, readOnly, onDone, bare }:
         </Text>
       ) : (
         <View className="gap-3 mt-5">
-          <Pressable
-            accessibilityRole="button"
-            onPress={addSet}
-            className="h-[52px] rounded-[10px] border border-border items-center justify-center"
-          >
-            <Text className="font-sans-semibold text-accent text-[15px]">+ Add Set</Text>
-          </Pressable>
+          <View className="flex-row gap-2">
+            <Pressable
+              accessibilityRole="button"
+              onPress={addSet}
+              className="flex-1 h-[52px] rounded-[10px] border border-border items-center justify-center"
+            >
+              <Text className="font-sans-semibold text-accent text-[15px]">+ Add Set</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add drop set"
+              accessibilityState={{ disabled: rows.length === 0 }}
+              disabled={rows.length === 0}
+              onPress={addDrop}
+              className={`flex-1 h-[52px] rounded-[10px] border border-border items-center justify-center ${rows.length === 0 ? 'opacity-40' : ''}`}
+            >
+              <Text className="font-sans-semibold text-accent text-[15px]">+ Drop</Text>
+            </Pressable>
+          </View>
           {showDone ? <Button variant="primary" label="Done" onPress={done} /> : null}
         </View>
       )}

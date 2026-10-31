@@ -39,9 +39,9 @@ def _defaults(table: str) -> dict:
         case "occurrence_moves":
             return {"routineId": _id(), "fromDate": "2026-10-19", "toDate": "2026-10-20", "shiftId": _id()}
         case "day_exercises":
-            return {"date": "2026-10-19", "position": 0, "name": "Bench press"}
+            return {"date": "2026-10-19", "position": 0, "name": "Bench press", "performedOrder": None}
         case "sets":
-            return {"dayExerciseId": _id(), "setNumber": 1, "reps": 8, "weightKg": 22.5}
+            return {"dayExerciseId": _id(), "setNumber": 1, "reps": 8, "weightKg": 22.5, "isDrop": False}
     raise KeyError(table)
 
 

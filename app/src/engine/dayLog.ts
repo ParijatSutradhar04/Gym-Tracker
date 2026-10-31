@@ -67,7 +67,7 @@ export function ensureDayLog(state: DataState, ctx: Ctx, date: DateStr): Change[
       seen.set(key, k + 1);
       return {
         table: 'day_exercises',
-        row: { id: stableId('day_exercise', `${date}|${key}|${k}`), updatedAt: now, deletedAt: null, date, position, name },
+        row: { id: stableId('day_exercise', `${date}|${key}|${k}`), updatedAt: now, deletedAt: null, date, position, name, performedOrder: null },
       };
     }),
   ];

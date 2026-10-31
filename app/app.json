@@ -7,6 +7,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/2b19e240-bdbb-43e7-b503-195eb6d89670"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -31,6 +34,11 @@
       "expo-font",
       "@react-native-community/datetimepicker"
     ],
-    "owner": "parijatsutradhars-team"
+    "owner": "parijatsutradhars-team",
+    "extra": {
+      "eas": {
+        "projectId": "2b19e240-bdbb-43e7-b503-195eb6d89670"
+      }
+    }
   }
 }

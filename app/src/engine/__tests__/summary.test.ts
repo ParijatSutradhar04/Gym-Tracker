@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { dayTotals, dayVolume, exerciseSummary } from '../summary';
-import { emptyState } from '../state';
-import { logSets, makeCtx, seedRoutine } from './fixtures';
+import { emptyState, liveRows } from '../state';
+import { logSets, makeCtx, run, seedRoutine } from './fixtures';
 
 function chest() {
   const ctx = makeCtx('2026-10-19');
@@ -53,5 +53,28 @@ describe('summary', () => {
     s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 60]]);
     s = logSets(s, ctx, '2026-10-19', 'Dips', [[12, null]]);
     expect(dayTotals(s, '2026-10-19')).toEqual({ exercises: 2, sets: 3, volumeKg: 1080 });
+  });
+});
+
+describe('summary with drops', () => {
+  test('drops_count_toward_volume_not_sets', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 45, true], [6, 30, true]]);
+    expect(exerciseSummary(s, '2026-10-19', 0)).toEqual({ setCount: 1, text: '1 set · 10 reps · 60 kg' });
+    expect(dayVolume(s, '2026-10-19')).toBe(1140);
+  });
+
+  test('prefill_count_excludes_drops', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-12', 'Bench press', [[10, 60], [10, 60], [8, 45, true]]);
+    expect(exerciseSummary(s, '2026-10-19', 0)).toEqual({ setCount: 2, text: '2 sets' });
+  });
+
+  test('orphan_first_row_drop_counts_as_a_set', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60]]);
+    const [only] = liveRows(s, 'sets');
+    s = run(s, [{ table: 'sets', row: { ...only, isDrop: true } }]);
+    expect(exerciseSummary(s, '2026-10-19', 0).setCount).toBe(1);
   });
 });

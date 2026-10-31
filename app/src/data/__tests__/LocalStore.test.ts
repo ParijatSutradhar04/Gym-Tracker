@@ -18,7 +18,7 @@ const day = (id: string, date: string, updatedAt = '2026-10-19T10:00:00.000Z', e
 
 const set = (id: string, n: number): Change => ({
   table: 'sets',
-  row: { id, updatedAt: '2026-10-19T10:00:00.000Z', deletedAt: null, dayExerciseId: 'x1', setNumber: n, reps: 10, weightKg: 60 } satisfies SetRow,
+  row: { id, updatedAt: '2026-10-19T10:00:00.000Z', deletedAt: null, dayExerciseId: 'x1', setNumber: n, reps: 10, weightKg: 60, isDrop: false } satisfies SetRow,
 });
 
 async function opened(storage = new MemoryStorage()) {

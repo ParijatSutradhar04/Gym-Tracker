@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { getDay } from '../../engine/dayView';
 import { persistedSets } from '../../engine/sets';
-import { EngineError, type Change, type SetRow } from '../../engine/types';
+import { EngineError, type Change, type DayExercise, type SetRow } from '../../engine/types';
 import type { PullPage, SyncApi } from '../../sync/api';
 import { createCursorStore } from '../../sync/cursor';
 import { pullAll } from '../../sync/pull';
@@ -27,7 +27,7 @@ const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 19, h, m)).toISOStri
 
 const set = (updatedAt: string, reps: number): Change => ({
   table: 'sets',
-  row: { id: 's1', updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60 },
+  row: { id: 's1', updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60, isDrop: false },
 });
 
 /** A SyncApi whose pull is answered by hand; `asked` resolves once the request is out. */
@@ -82,7 +82,7 @@ describe('GymStore', () => {
     const { storage, gym } = await opened();
     const actions = createActions(gym, () => TODAY);
     actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
-    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: true });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: true });
     await gym.whenIdle();
 
     const local = new LocalStore(storage, deps('ob'));
@@ -93,6 +93,19 @@ describe('GymStore', () => {
     expect(v.exercises[0]).toMatchObject({ name: 'Bench press', setCount: 1 });
     expect(v.totals.volumeKg).toBe(600);
     expect(await local.count()).toBeGreaterThan(0);
+  });
+
+  test('set_save_queues_the_order_change_in_the_same_commit', async () => {
+    const { local, gym } = await opened();
+    const actions = createActions(gym, () => TODAY);
+    actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
+    await gym.whenIdle();
+    const queued = (await local.peek(1000)).length;
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: false });
+    await gym.whenIdle();
+    const added = (await local.peek(1000)).slice(queued).map((e) => e.change);
+    expect(added.some((c) => c.table === 'sets')).toBe(true);
+    expect(added.filter((c) => c.table === 'day_exercises').map((c) => (c.row as DayExercise).performedOrder)).toContain(1);
   });
 
   test('failed_write_keeps_ui_state_and_sets_lastError', async () => {
@@ -253,7 +266,7 @@ describe('GymStore', () => {
     const { gym } = await opened();
     const actions = createActions(gym, () => TODAY);
     actions.addSchedule({ date: TODAY, title: 'Chest', repeatRule: 'weekly', exercises: ['Bench press'] });
-    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true }], includeUntouched: true });
+    actions.syncSets({ date: TODAY, position: 0, rows: [{ reps: 10, weightKg: 60, touched: true, isDrop: false }], includeUntouched: true });
     const [mine] = persistedSets(gym.getState(), TODAY, 0);
     expect(getDay(gym.getState(), gym.ctx(TODAY), TODAY).totals.volumeKg).toBe(600);
 

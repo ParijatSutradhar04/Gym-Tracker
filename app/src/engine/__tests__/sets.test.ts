@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { getSetsSheet, parseRepsInput, parseWeightInput, prefillRows, syncSets, type SetDraft } from '../sets';
+import { getSetsSheet, numberSets, parseRepsInput, parseWeightInput, prefillRows, removalEnd, syncSets, type SetDraft } from '../sets';
 import { emptyState, getIndex, liveRows } from '../state';
+import type { SetRow } from '../types';
 import { expectCode, logSets, makeCtx, run, seedRoutine } from './fixtures';
 
-const empty = { reps: null, weightKg: null, touched: false };
-const draft = (reps: number | null, weightKg: number | null, touched = true): SetDraft => ({ reps, weightKg, touched });
+const empty = { reps: null, weightKg: null, touched: false, isDrop: false };
+const draft = (reps: number | null, weightKg: number | null, touched = true, isDrop = false): SetDraft => ({ reps, weightKg, touched, isDrop });
 
 function chest(today = '2026-10-19') {
   const ctx = makeCtx(today);
@@ -33,10 +34,10 @@ describe('prefill', () => {
     s = logSets(s, ctx, '2026-10-12', 'Bench press', [[10, 60], [8, 62.5]]);
     s = logSets(s, ctx, '2026-10-15', 'Bench press', [[12, 65]]);
     s = logSets(s, ctx, '2026-10-17', 'Bench press', [[null, 70]]);
-    expect(prefillRows(s, '2026-10-19', 'Bench press')).toEqual([{ reps: 12, weightKg: 65, touched: false }]);
+    expect(prefillRows(s, '2026-10-19', 'Bench press')).toEqual([{ reps: 12, weightKg: 65, touched: false, isDrop: false }]);
     expect(prefillRows(s, '2026-10-15', 'Bench press')).toEqual([
-      { reps: 10, weightKg: 60, touched: false },
-      { reps: 8, weightKg: 62.5, touched: false },
+      { reps: 10, weightKg: 60, touched: false, isDrop: false },
+      { reps: 8, weightKg: 62.5, touched: false, isDrop: false },
     ]);
     expect(prefillRows(s, '2026-10-12', 'Bench press')).toEqual([empty, empty, empty]);
   });
@@ -164,5 +165,73 @@ describe('input parsing', () => {
     expect(parseWeightInput('1.2.3')).toBe('invalid');
     expect(parseWeightInput('1001')).toBe('invalid');
     expect(parseWeightInput('1000')).toBe(1000);
+  });
+});
+
+describe('drop sets', () => {
+  const kinds = (...drops: boolean[]) => drops.map((isDrop) => ({ isDrop }));
+  const liveDrops = (s: ReturnType<typeof emptyState>) =>
+    liveRows(s, 'sets').sort((a, b) => a.setNumber - b.setNumber).map((x) => [x.setNumber, x.isDrop]);
+
+  test('numberSets_numbers_drops_under_their_set_and_treats_a_first_row_drop_as_a_set', () => {
+    expect(numberSets(kinds(false, true, true, false))).toEqual([
+      { number: 1, isDrop: false },
+      { number: 1, isDrop: true },
+      { number: 1, isDrop: true },
+      { number: 2, isDrop: false },
+    ]);
+    expect(numberSets(kinds(true, true, false))).toEqual([
+      { number: 1, isDrop: false },
+      { number: 1, isDrop: true },
+      { number: 2, isDrop: false },
+    ]);
+  });
+
+  test('removalEnd_takes_a_sets_drops_and_only_the_drop', () => {
+    const rows = kinds(false, true, true, false);
+    expect(removalEnd(rows, 0)).toBe(3);
+    expect(removalEnd(rows, 1)).toBe(2);
+    expect(removalEnd(rows, 3)).toBe(4);
+  });
+
+  test('drop_rows_save_isDrop', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 45, true], [10, 60]]);
+    expect(liveDrops(s)).toEqual([[1, false], [2, true], [3, false]]);
+  });
+
+  test('toggling_a_row_to_a_drop_saves_it', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 45]]);
+    const changes = syncSets(s, ctx, { date: '2026-10-19', position: 0, rows: [draft(10, 60), draft(8, 45, true, true)], includeUntouched: false });
+    expect(changes.filter((c) => c.table === 'sets').map((c) => [(c.row as SetRow).setNumber, (c.row as SetRow).isDrop])).toEqual([[2, true]]);
+  });
+
+  test('toggling_an_untouched_row_saves_only_that_row', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-12', 'Bench press', [[10, 60], [8, 45], [6, 30]]);
+    const rows = prefillRows(s, '2026-10-19', 'Bench press');
+    rows[1] = { ...rows[1], touched: true, isDrop: true };
+    s = run(s, syncSets(s, ctx, { date: '2026-10-19', position: 0, rows, includeUntouched: false }));
+    const today = getIndex(s).exercisesByDate.get('2026-10-19')![0];
+    expect(getIndex(s).setsByExercise.get(today.id)!.map((x) => [x.setNumber, x.reps, x.isDrop])).toEqual([[2, 8, true]]);
+  });
+
+  test('first_row_is_never_saved_as_a_drop', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[8, 45, true], [6, 30, true]]);
+    expect(liveDrops(s)).toEqual([[1, false], [2, true]]);
+  });
+
+  test('prefill_copies_drops', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-12', 'Bench press', [[10, 60], [8, 45, true]]);
+    expect(prefillRows(s, '2026-10-19', 'Bench press').map((r) => r.isDrop)).toEqual([false, true]);
+  });
+
+  test('sheet_rows_carry_isDrop', () => {
+    let { ctx, s } = chest();
+    s = logSets(s, ctx, '2026-10-19', 'Bench press', [[10, 60], [8, 45, true]]);
+    expect(getSetsSheet(s, ctx, '2026-10-19', 0).rows.map((r) => r.isDrop)).toEqual([false, true]);
   });
 });

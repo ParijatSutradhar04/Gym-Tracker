@@ -1,9 +1,22 @@
 import { addMonthsClamped, eachDay, formatKg, WEEKDAY_SHORT, weekdayIndex, type DateStr } from './dates';
 import { scheduleBetween } from './schedule';
+import { numberSets } from './sets';
 import { getIndex } from './state';
 import { EngineError, type DataState } from './types';
 
-export const CSV_COLUMNS = ['date', 'weekday', 'routine', 'exercise', 'set_number', 'reps', 'weight_kg', 'volume_kg', 'status'] as const;
+export const CSV_COLUMNS = [
+  'date',
+  'weekday',
+  'routine',
+  'exercise',
+  'exercise_order',
+  'set_number',
+  'is_drop',
+  'reps',
+  'weight_kg',
+  'volume_kg',
+  'status',
+] as const;
 
 export type ExportRangeKind = 'last_month' | 'last_3_months' | 'custom';
 
@@ -28,7 +41,8 @@ function field(v: string | number | null): string {
 
 /**
  * One row per logged set (day-log names), else one status row for a day that was skipped, missed,
- * or planned but not logged before today. Rest days and future dates produce nothing.
+ * or planned but not logged before today. Rest days and future dates produce nothing. Exercises run in
+ * the order they were done (those without an order after, by position); a drop repeats its set's number.
  */
 export function buildCsv(state: DataState, from: DateStr, to: DateStr, today: DateStr): string {
   const out: string[] = [CSV_COLUMNS.join(',')];
@@ -42,20 +56,26 @@ export function buildCsv(state: DataState, from: DateStr, to: DateStr, today: Da
       const routine = (day?.hasLog || day?.status ? day.title : null) ?? sched.get(date)?.title ?? '';
       let logged = 0;
       if (day?.hasLog) {
-        for (const x of idx.exercisesByDate.get(date) ?? []) {
-          for (const s of idx.setsByExercise.get(x.id) ?? []) {
+        const exercises = [...(idx.exercisesByDate.get(date) ?? [])].sort(
+          (a, b) => (a.performedOrder ?? Infinity) - (b.performedOrder ?? Infinity),
+        );
+        for (const x of exercises) {
+          const sets = idx.setsByExercise.get(x.id) ?? [];
+          const kinds = numberSets(sets);
+          for (const [i, s] of sets.entries()) {
             if (s.reps === null) continue;
             logged++;
             const volume = s.weightKg === null ? null : formatKg(s.reps * s.weightKg);
             const weight = s.weightKg === null ? null : formatKg(s.weightKg);
-            out.push([date, weekday, routine, x.name, s.setNumber, s.reps, weight, volume, 'logged'].map(field).join(','));
+            const { number, isDrop } = kinds[i];
+            out.push([date, weekday, routine, x.name, x.performedOrder, number, String(isDrop), s.reps, weight, volume, 'logged'].map(field).join(','));
           }
         }
       }
       if (logged > 0) continue;
       const planned = sched.has(date) || (day?.hasLog === true && day.routineId !== null);
       const status = day?.status ?? (date < today && planned ? 'not_logged' : null);
-      if (status) out.push([date, weekday, routine, null, null, null, null, null, status].map(field).join(','));
+      if (status) out.push([date, weekday, routine, null, null, null, null, null, null, null, status].map(field).join(','));
     }
   }
   return out.join('\n') + '\n';

@@ -2,7 +2,8 @@ import type { DateStr } from './dates';
 import { dayExercises, ensureDayLog, loggedExercises } from './dayLog';
 import { normalizeName, requireName } from './names';
 import { scheduleOn, versionAt } from './schedule';
-import { createRecorder, getIndex, liveRows } from './state';
+import { orderChanges } from './order';
+import { applyChanges, createRecorder, getIndex, liveRows } from './state';
 import { EngineError, type Change, type Ctx, type DataState, type RepeatRule, type RoutineVersion } from './types';
 
 function requireEditable(ctx: Ctx, date: DateStr): void {
@@ -128,16 +129,17 @@ function editLog(state: DataState, ctx: Ctx, date: DateStr, op: ExerciseOp): Cha
   if (op.kind === 'add') {
     let max = -1;
     for (const x of state.day_exercises.values()) if (x.date === date && x.position > max) max = x.position;
-    return [{ table: 'day_exercises', row: { id: ctx.newId(), updatedAt: now, deletedAt: null, date, position: max + 1, name: op.name } }];
+    return [{ table: 'day_exercises', row: { id: ctx.newId(), updatedAt: now, deletedAt: null, date, position: max + 1, name: op.name, performedOrder: null } }];
   }
   const target = rows[op.position];
   if (op.kind === 'rename') return [{ table: 'day_exercises', row: { ...target, name: op.name, updatedAt: now } }];
-  return [
-    { table: 'day_exercises', row: { ...target, updatedAt: now, deletedAt: now } },
+  const removed: Change[] = [
+    { table: 'day_exercises', row: { ...target, performedOrder: null, updatedAt: now, deletedAt: now } },
     ...(getIndex(state).setsByExercise.get(target.id) ?? []).map(
       (s): Change => ({ table: 'sets', row: { ...s, updatedAt: now, deletedAt: now } }),
     ),
   ];
+  return [...removed, ...orderChanges(applyChanges(state, removed), date, now)];
 }
 
 /**

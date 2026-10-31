@@ -68,11 +68,11 @@ describe('state', () => {
     const t = '2026-10-19T10:00:00.000Z';
     const base = { updatedAt: t, deletedAt: null };
     const s = applyChanges(emptyState(), [
-      { table: 'day_exercises', row: { id: 'x2', ...base, date: '2026-10-19', position: 1, name: 'B' } },
-      { table: 'day_exercises', row: { id: 'x1', ...base, date: '2026-10-19', position: 1, name: 'A' } },
-      { table: 'day_exercises', row: { id: 'x0', ...base, date: '2026-10-19', position: 0, name: 'Z' } },
-      { table: 'sets', row: { id: 's2', ...base, dayExerciseId: 'x0', setNumber: 2, reps: 8, weightKg: null } },
-      { table: 'sets', row: { id: 's1', ...base, dayExerciseId: 'x0', setNumber: 1, reps: 10, weightKg: 60 } },
+      { table: 'day_exercises', row: { id: 'x2', ...base, date: '2026-10-19', position: 1, name: 'B', performedOrder: null } },
+      { table: 'day_exercises', row: { id: 'x1', ...base, date: '2026-10-19', position: 1, name: 'A', performedOrder: null } },
+      { table: 'day_exercises', row: { id: 'x0', ...base, date: '2026-10-19', position: 0, name: 'Z', performedOrder: null } },
+      { table: 'sets', row: { id: 's2', ...base, dayExerciseId: 'x0', setNumber: 2, reps: 8, weightKg: null, isDrop: false } },
+      { table: 'sets', row: { id: 's1', ...base, dayExerciseId: 'x0', setNumber: 1, reps: 10, weightKg: 60, isDrop: false } },
       { table: 'routine_versions', row: { id: 'v2', ...base, routineId: 'r', effectiveFrom: '2026-11-01', title: 'T', repeatRule: 'weekly', startDate: '2026-10-19', exercises: [], ended: false } },
       { table: 'routine_versions', row: { id: 'v1', ...base, routineId: 'r', effectiveFrom: '2026-10-19', title: 'T', repeatRule: 'weekly', startDate: '2026-10-19', exercises: [], ended: false } },
       { table: 'occurrence_moves', row: { id: 'm2', updatedAt: '2026-10-19T09:00:00.000Z', deletedAt: null, routineId: 'r', fromDate: '2026-10-19', toDate: '2026-10-20', shiftId: 'sh' } },

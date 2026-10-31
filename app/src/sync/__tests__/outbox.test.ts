@@ -7,7 +7,7 @@ const T = (s: number) => new Date(Date.UTC(2026, 9, 19, 12, 0, s)).toISOString()
 
 const set = (id: string, reps: number, s: number): Change => ({
   table: 'sets',
-  row: { id, updatedAt: T(s), deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60 },
+  row: { id, updatedAt: T(s), deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60, isDrop: false },
 });
 
 const day = (id: string, s: number): Change => ({
