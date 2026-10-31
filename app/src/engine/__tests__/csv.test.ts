@@ -8,7 +8,7 @@ import type { Ctx, DataState, Day } from '../types';
 import { expectCode, logSets, makeCtx, routineId, run, seedRoutine } from './fixtures';
 
 const TODAY = '2026-10-19';
-const HEADER = 'date,weekday,routine,exercise,set_number,reps,weight_kg,volume_kg,status';
+const HEADER = 'date,weekday,routine,exercise,exercise_order,set_number,is_drop,reps,weight_kg,volume_kg,status';
 
 function markDay(s: DataState, ctx: Ctx, date: string, status: Day['status']): DataState {
   const s1 = run(s, ensureDayLog(s, ctx, date));
@@ -45,9 +45,9 @@ describe('buildCsv', () => {
     const out = lines(buildCsv(s, '2026-09-07', '2026-09-07', TODAY));
     expect(out).toEqual([
       HEADER,
-      '2026-09-07,Mon,Chest & Tricep,Bench press,1,10,60,600,logged',
-      '2026-09-07,Mon,Chest & Tricep,Bench press,2,8,62.5,500,logged',
-      '2026-09-07,Mon,Chest & Tricep,Pull-up,1,12,,,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,1,false,10,60,600,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,2,false,8,62.5,500,logged',
+      '2026-09-07,Mon,Chest & Tricep,Pull-up,2,1,false,12,,,logged',
       '',
     ]);
   });
@@ -57,11 +57,11 @@ describe('buildCsv', () => {
     const out = lines(buildCsv(s, '2026-09-08', '2026-10-18', TODAY));
     expect(out).toEqual([
       HEADER,
-      '2026-09-14,Mon,Chest & Tricep,,,,,,skipped',
-      '2026-09-21,Mon,Chest & Tricep,,,,,,missed',
-      '2026-09-28,Mon,Chest & Tricep,,,,,,not_logged',
-      '2026-10-05,Mon,Chest & Tricep,,,,,,not_logged',
-      '2026-10-12,Mon,Chest & Tricep,,,,,,not_logged',
+      '2026-09-14,Mon,Chest & Tricep,,,,,,,,skipped',
+      '2026-09-21,Mon,Chest & Tricep,,,,,,,,missed',
+      '2026-09-28,Mon,Chest & Tricep,,,,,,,,not_logged',
+      '2026-10-05,Mon,Chest & Tricep,,,,,,,,not_logged',
+      '2026-10-12,Mon,Chest & Tricep,,,,,,,,not_logged',
       '',
     ]);
   });
@@ -86,36 +86,57 @@ describe('buildCsv', () => {
   test('todays_logged_sets_and_status_are_exported', () => {
     const { ctx, s } = fixture();
     const s1 = logSets(s, ctx, TODAY, 'Bench press', [[5, 80]]);
-    expect(buildCsv(s1, TODAY, TODAY, TODAY)).toBe(`${HEADER}\n2026-10-19,Mon,Chest & Tricep,Bench press,1,5,80,400,logged\n`);
+    expect(buildCsv(s1, TODAY, TODAY, TODAY)).toBe(`${HEADER}\n2026-10-19,Mon,Chest & Tricep,Bench press,1,1,false,5,80,400,logged\n`);
     const s2 = markDay(s, ctx, TODAY, 'skipped');
-    expect(buildCsv(s2, TODAY, TODAY, TODAY)).toBe(`${HEADER}\n2026-10-19,Mon,Chest & Tricep,,,,,,skipped\n`);
+    expect(buildCsv(s2, TODAY, TODAY, TODAY)).toBe(`${HEADER}\n2026-10-19,Mon,Chest & Tricep,,,,,,,,skipped\n`);
   });
 
   test('names_are_as_logged_that_day', () => {
     const { ctx, s, id } = fixture();
     const s1 = run(s, changeSchedule(s, ctx, { routineId: id, date: TODAY, title: 'Push', repeatRule: 'weekly' }));
     const out = buildCsv(s1, '2026-09-07', '2026-09-07', TODAY);
-    expect(out).toContain('2026-09-07,Mon,Chest & Tricep,Bench press,1,10,60,600,logged');
+    expect(out).toContain('2026-09-07,Mon,Chest & Tricep,Bench press,1,1,false,10,60,600,logged');
     expect(out).not.toContain('Push');
   });
 
   test('quoting', () => {
     const { ctx, s } = seeded('Legs, core', ['5" plate']);
     const s1 = logSets(s, ctx, '2026-09-07', '5" plate', [[10, 20]]);
-    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY))[1]).toBe('2026-09-07,Mon,"Legs, core","5"" plate",1,10,20,200,logged');
+    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY))[1]).toBe('2026-09-07,Mon,"Legs, core","5"" plate",1,1,false,10,20,200,logged');
   });
 
-  test('sorted_by_date_exercise_order_then_set', () => {
+  test('sorted_by_date_then_performed_order_then_row', () => {
     const { ctx, s } = seeded();
     let s1 = logSets(s, ctx, '2026-09-14', 'Pull-up', [[12, null]]);
     s1 = logSets(s1, ctx, '2026-09-14', 'Bench press', [[10, 60], [8, 62.5]]);
     s1 = logSets(s1, ctx, '2026-09-07', 'Bench press', [[1, 1]]);
-    const out = lines(buildCsv(s1, '2026-09-07', '2026-09-14', TODAY)).map((l) => l.split(',').slice(0, 5).join(','));
+    const out = lines(buildCsv(s1, '2026-09-07', '2026-09-14', TODAY)).map((l) => l.split(',').slice(0, 6).join(','));
     expect(out.slice(1, -1)).toEqual([
-      '2026-09-07,Mon,Chest & Tricep,Bench press,1',
-      '2026-09-14,Mon,Chest & Tricep,Bench press,1',
-      '2026-09-14,Mon,Chest & Tricep,Bench press,2',
-      '2026-09-14,Mon,Chest & Tricep,Pull-up,1',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,1',
+      '2026-09-14,Mon,Chest & Tricep,Pull-up,1,1',
+      '2026-09-14,Mon,Chest & Tricep,Bench press,2,1',
+      '2026-09-14,Mon,Chest & Tricep,Bench press,2,2',
+    ]);
+  });
+
+  test('drop_rows_repeat_their_parents_set_number', () => {
+    const { ctx, s } = seeded();
+    const s1 = logSets(s, ctx, '2026-09-07', 'Bench press', [[10, 60], [8, 45, true], [10, 60]]);
+    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY)).slice(1, -1)).toEqual([
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,1,false,10,60,600,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,1,true,8,45,360,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,2,false,10,60,600,logged',
+    ]);
+  });
+
+  test('unnumbered_exercises_come_after_numbered_ones_by_position', () => {
+    const { s } = fixture();
+    const bench = getIndex(s).exercisesByDate.get('2026-09-07')![0];
+    const s1 = run(s, [{ table: 'day_exercises', row: { ...bench, performedOrder: null } }]);
+    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY)).slice(1, -1)).toEqual([
+      '2026-09-07,Mon,Chest & Tricep,Pull-up,2,1,false,12,,,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,,1,false,10,60,600,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,,2,false,8,62.5,500,logged',
     ]);
   });
 
@@ -128,7 +149,7 @@ describe('buildCsv', () => {
     let s1 = run(s, startBackfill(s, ctx, { date: '2026-09-09', title: 'Cardio' }));
     s1 = run(s1, addExercise(s1, ctx, { date: '2026-09-09', name: 'Rowing' }));
     s1 = logSets(s1, ctx, '2026-09-09', 'Rowing', [[20, null]]);
-    expect(lines(buildCsv(s1, '2026-09-09', '2026-09-09', TODAY))[1]).toBe('2026-09-09,Wed,Cardio,Rowing,1,20,,,logged');
+    expect(lines(buildCsv(s1, '2026-09-09', '2026-09-09', TODAY))[1]).toBe('2026-09-09,Wed,Cardio,Rowing,1,1,false,20,,,logged');
   });
 
   test('deleted_sets_and_exercises_are_not_exported', () => {
@@ -137,7 +158,7 @@ describe('buildCsv', () => {
     let s1 = run(s, syncSets(s, ctx, { date: '2026-09-07', position: 0, rows, includeUntouched: true }));
     s1 = run(s1, deleteExercise(s1, ctx, { date: '2026-09-07', position: 1 }));
     expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY)).slice(1)).toEqual([
-      '2026-09-07,Mon,Chest & Tricep,Bench press,1,10,60,600,logged',
+      '2026-09-07,Mon,Chest & Tricep,Bench press,1,1,false,10,60,600,logged',
       '',
     ]);
   });
@@ -145,7 +166,7 @@ describe('buildCsv', () => {
   test('sets_without_reps_are_not_rows', () => {
     const { ctx, s } = seeded();
     const s1 = logSets(s, ctx, '2026-09-07', 'Bench press', [[null, 60]]);
-    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY))[1]).toBe('2026-09-07,Mon,Chest & Tricep,,,,,,not_logged');
+    expect(lines(buildCsv(s1, '2026-09-07', '2026-09-07', TODAY))[1]).toBe('2026-09-07,Mon,Chest & Tricep,,,,,,,,not_logged');
   });
 });
 
