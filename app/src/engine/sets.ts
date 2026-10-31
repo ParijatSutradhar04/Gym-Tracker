@@ -119,7 +119,7 @@ export function syncSets(
       table: 'sets',
       row: prev
         ? { ...prev, reps: row.reps, weightKg: row.weightKg, updatedAt: now }
-        : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg },
+        : { id: stableId('set', `${dayExerciseId}|${setNumber}`), updatedAt: now, deletedAt: null, dayExerciseId, setNumber, reps: row.reps, weightKg: row.weightKg, isDrop: false },
     })),
   );
   return rec.changes();

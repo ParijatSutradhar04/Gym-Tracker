@@ -21,7 +21,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 const set = (id: string, reps: number, updatedAt = iso(NOW)): Change => ({
   table: 'sets',
-  row: { id, updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60 },
+  row: { id, updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60, isDrop: false },
 });
 
 const day = (id: string): Change => ({

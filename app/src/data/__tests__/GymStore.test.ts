@@ -27,7 +27,7 @@ const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 19, h, m)).toISOStri
 
 const set = (updatedAt: string, reps: number): Change => ({
   table: 'sets',
-  row: { id: 's1', updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60 },
+  row: { id: 's1', updatedAt, deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps, weightKg: 60, isDrop: false },
 });
 
 /** A SyncApi whose pull is answered by hand; `asked` resolves once the request is out. */

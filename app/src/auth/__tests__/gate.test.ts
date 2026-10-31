@@ -62,7 +62,7 @@ describe('hasLocalData', () => {
     const state = applyChanges(emptyState(), [
       {
         table: 'sets',
-        row: { id: 's1', updatedAt: '2026-10-19T12:00:00.000Z', deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps: 8, weightKg: 60 },
+        row: { id: 's1', updatedAt: '2026-10-19T12:00:00.000Z', deletedAt: null, dayExerciseId: 'x1', setNumber: 1, reps: 8, weightKg: 60, isDrop: false },
       },
     ]);
     expect(hasLocalData(state)).toBe(true);

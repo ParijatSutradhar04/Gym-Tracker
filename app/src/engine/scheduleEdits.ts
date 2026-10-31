@@ -128,7 +128,7 @@ function editLog(state: DataState, ctx: Ctx, date: DateStr, op: ExerciseOp): Cha
   if (op.kind === 'add') {
     let max = -1;
     for (const x of state.day_exercises.values()) if (x.date === date && x.position > max) max = x.position;
-    return [{ table: 'day_exercises', row: { id: ctx.newId(), updatedAt: now, deletedAt: null, date, position: max + 1, name: op.name } }];
+    return [{ table: 'day_exercises', row: { id: ctx.newId(), updatedAt: now, deletedAt: null, date, position: max + 1, name: op.name, performedOrder: null } }];
   }
   const target = rows[op.position];
   if (op.kind === 'rename') return [{ table: 'day_exercises', row: { ...target, name: op.name, updatedAt: now } }];

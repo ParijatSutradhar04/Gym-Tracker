@@ -66,6 +66,8 @@ export interface DayExercise extends BaseRow {
   date: DateStr;
   position: number;
   name: string;
+  /** Order the exercise was done in that day (1, 2, …); null until it has a logged set. Never shown in the app. */
+  performedOrder: number | null;
 }
 
 export interface SetRow extends BaseRow {
@@ -73,6 +75,8 @@ export interface SetRow extends BaseRow {
   setNumber: number;
   reps: number | null;
   weightKg: number | null;
+  /** Continues the nearest normal set above it at a lower weight. Never true on set 1. */
+  isDrop: boolean;
 }
 
 interface RowTypes {
