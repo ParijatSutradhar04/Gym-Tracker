@@ -133,6 +133,11 @@ MISSING = object()
         ("sets", {"reps": True}),
         ("sets", {"weightKg": "22.5"}),
         ("day_exercises", {"position": 2**31}),
+        ("day_exercises", {"performedOrder": 0}),
+        ("day_exercises", {"performedOrder": -1}),
+        ("day_exercises", {"performedOrder": 1.5}),
+        ("sets", {"isDrop": "true"}),
+        ("sets", {"isDrop": 1}),
         ("day_exercises", {"name": "Bench\x00"}),
         ("shifts", {"before": [{"table": "days", "row": {"title": "\ud800"}}]}),
     ],
@@ -236,3 +241,24 @@ async def test_push_round_trips_are_bounded(db, user_a):
         result = await sync.push(conn, user_a, entries)
     assert len(result["acked"]) == 6
     assert conn.statements <= 4
+
+
+async def test_new_fields_round_trip(push, pull):
+    exercise = sample_row("day_exercises", performedOrder=2)
+    drop = sample_row("sets", isDrop=True)
+    r = await push([{"id": "e1", "table": "day_exercises", "row": exercise}, {"id": "e2", "table": "sets", "row": drop}])
+    assert len(r.json()["acked"]) == 2
+    rows = {c["row"]["id"]: c["row"] for c in (await pull()).json()["changes"]}
+    assert rows[exercise["id"]] == exercise
+    assert rows[drop["id"]] == drop
+
+
+async def test_missing_new_fields_are_stored_as_defaults_even_on_update(push, db):
+    exercise = sample_row("day_exercises", performedOrder=2, updatedAt=T1)
+    await push([{"id": "e1", "table": "day_exercises", "row": exercise}])
+    old_app = {k: v for k, v in exercise.items() if k != "performedOrder"} | {"updatedAt": T2}
+    old_set = {k: v for k, v in sample_row("sets").items() if k != "isDrop"}
+    r = await push([{"id": "e2", "table": "day_exercises", "row": old_app}, {"id": "e3", "table": "sets", "row": old_set}])
+    assert sorted(r.json()["acked"]) == ["e2", "e3"]
+    assert (await fetch_one(db, "day_exercises", exercise["id"]))["performed_order"] is None
+    assert (await fetch_one(db, "sets", old_set["id"]))["is_drop"] is False

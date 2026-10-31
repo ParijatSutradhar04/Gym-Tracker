@@ -57,6 +57,7 @@ async def test_seq_is_assigned_increasing(db):
         ("sets", "reps", 1000),
         ("sets", "set_number", 0),
         ("day_exercises", "position", -1),
+        ("day_exercises", "performed_order", 0),
     ],
 )
 async def test_check_constraints_reject_bad_enum_and_ranges(db, table, column, value):
@@ -80,6 +81,21 @@ async def test_migrate_applies_new_migrations_once(db, tmp_path):
         await db.execute("DROP TABLE IF EXISTS migrate_probe")
         await db.execute("DELETE FROM schema_migrations WHERE name = '001_x.sql'")
     assert MIGRATIONS_DIR.is_dir()
+
+
+async def test_migration_001_adds_performed_order_and_is_drop(db):
+    cols = {
+        (r["table_name"], r["column_name"]): r
+        for r in await db.fetch(
+            "SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns"
+            " WHERE table_schema = 'public' AND column_name IN ('performed_order', 'is_drop')"
+        )
+    }
+    order, drop = cols[("day_exercises", "performed_order")], cols[("sets", "is_drop")]
+    assert (order["data_type"], order["is_nullable"]) == ("integer", "YES")
+    assert (drop["data_type"], drop["is_nullable"], drop["column_default"]) == ("boolean", "NO", "false")
+    applied = await db.fetchval("SELECT count(*) FROM schema_migrations WHERE name = '001_drop_sets_and_exercise_order.sql'")
+    assert applied == 1
 
 
 PUBLIC_TABLES = """
